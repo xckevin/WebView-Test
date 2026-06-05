@@ -8,9 +8,7 @@ plugins {
 android {
     namespace = "com.xckevin.android.app.webview.test"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(36)
     }
 
     defaultConfig {
@@ -33,12 +31,13 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
         compose = true
     }
+    buildToolsVersion = "36.1.0"
 }
 
 ksp {
