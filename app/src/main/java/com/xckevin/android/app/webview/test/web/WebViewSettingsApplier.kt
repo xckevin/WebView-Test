@@ -6,6 +6,7 @@ import com.xckevin.android.app.webview.test.model.MixedContentMode
 import com.xckevin.android.app.webview.test.model.UserAgentMode
 import com.xckevin.android.app.webview.test.model.WebCacheMode
 import com.xckevin.android.app.webview.test.model.WebTestConfig
+import java.util.WeakHashMap
 
 data class WebViewSettingsSnapshot(
     val javaScriptEnabled: Boolean,
@@ -16,6 +17,8 @@ data class WebViewSettingsSnapshot(
 )
 
 object WebViewSettingsApplier {
+    private val defaultUserAgents = WeakHashMap<WebView, String>()
+
     fun snapshot(config: WebTestConfig, defaultUserAgent: String): WebViewSettingsSnapshot =
         WebViewSettingsSnapshot(
             javaScriptEnabled = config.javaScriptEnabled,
@@ -27,14 +30,28 @@ object WebViewSettingsApplier {
 
     fun apply(webView: WebView, config: WebTestConfig) {
         val settings = webView.settings
-        val snapshot = snapshot(config = config, defaultUserAgent = settings.userAgentString.orEmpty())
+        val defaultUserAgent = defaultUserAgentFor(webView, settings.userAgentString.orEmpty())
+        val snapshot = snapshot(config = config, defaultUserAgent = defaultUserAgent)
 
         settings.javaScriptEnabled = snapshot.javaScriptEnabled
         settings.domStorageEnabled = snapshot.domStorageEnabled
         settings.cacheMode = snapshot.cacheMode
         settings.mixedContentMode = snapshot.mixedContentMode
-        snapshot.userAgentString?.let { settings.userAgentString = it }
+        settings.userAgentString = userAgentStringForApply(
+            snapshot = snapshot,
+            defaultUserAgent = defaultUserAgent,
+        )
     }
+
+    internal fun userAgentStringForApply(
+        snapshot: WebViewSettingsSnapshot,
+        defaultUserAgent: String,
+    ): String = snapshot.userAgentString ?: defaultUserAgent
+
+    private fun defaultUserAgentFor(webView: WebView, currentUserAgent: String): String =
+        synchronized(defaultUserAgents) {
+            defaultUserAgents.getOrPut(webView) { currentUserAgent }
+        }
 
     private fun WebCacheMode.toWebSettingsCacheMode(): Int =
         when (this) {

@@ -8,6 +8,7 @@ import com.xckevin.android.app.webview.test.model.WebTestConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,6 +41,38 @@ class WebViewSettingsApplierTest {
         )
 
         assertEquals("CustomTestAgent/1.0", snapshot.userAgentString)
+    }
+
+    @Test fun defaultUserAgentRestoresDefaultForApplyResolution() {
+        val snapshot = WebViewSettingsApplier.snapshot(
+            config = WebTestConfig.default(),
+            defaultUserAgent = defaultUserAgent,
+        )
+
+        assertNull(snapshot.userAgentString)
+        assertEquals(
+            defaultUserAgent,
+            WebViewSettingsApplier.userAgentStringForApply(
+                snapshot = snapshot,
+                defaultUserAgent = defaultUserAgent,
+            )
+        )
+    }
+
+    @Test fun desktopUserAgentUsesProvidedDefaultForApplyResolution() {
+        val mutatedUserAgent = "CustomTestAgent/1.0"
+        val snapshot = WebViewSettingsApplier.snapshot(
+            config = WebTestConfig.default().copy(userAgentMode = UserAgentMode.DESKTOP),
+            defaultUserAgent = defaultUserAgent,
+        )
+
+        val resolvedUserAgent = WebViewSettingsApplier.userAgentStringForApply(
+            snapshot = snapshot,
+            defaultUserAgent = mutatedUserAgent,
+        )
+
+        assertTrue(resolvedUserAgent.contains("Chrome/125.0.0.0"))
+        assertFalse(resolvedUserAgent.contains(mutatedUserAgent))
     }
 
     @Test fun noCacheMapsToWebSettingsNoCache() {
