@@ -192,4 +192,14 @@ class WebViewNavigationTrackerTest {
         assertNotEquals(firstLoad, reload)
         assertNull(loadedNavigationKey(" ", navigationId = 3L))
     }
+
+    @Test fun loadedNavigationKeyUsesRequestedUrlInsteadOfObservedCurrentUrl() {
+        val requestedUrl = "https://example.com/requested"
+        val currentUrl = "https://example.com/observed"
+
+        val key = loadedNavigationKey(requestedUrl, navigationId = 1L)
+
+        assertEquals(requestedUrl, key?.url)
+        assertNotEquals(currentUrl, key?.url)
+    }
 }

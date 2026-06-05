@@ -41,8 +41,8 @@ internal data class LoadedNavigationKey(
     val navigationId: Long,
 )
 
-internal fun loadedNavigationKey(url: String?, navigationId: Long): LoadedNavigationKey? =
-    url?.takeUnless { it.isBlank() }?.let {
+internal fun loadedNavigationKey(requestedUrl: String?, navigationId: Long): LoadedNavigationKey? =
+    requestedUrl?.takeUnless { it.isBlank() }?.let {
         LoadedNavigationKey(url = it, navigationId = navigationId)
     }
 
@@ -51,7 +51,7 @@ fun rememberWebViewController(): WebViewController = remember { WebViewControlle
 
 @Composable
 fun WebViewHost(
-    url: String?,
+    requestedUrl: String?,
     config: WebTestConfig,
     isFullscreen: Boolean,
     requestedNavigationId: Long,
@@ -60,7 +60,7 @@ fun WebViewHost(
 ) {
     val controller = rememberWebViewController()
     WebViewHost(
-        url = url,
+        requestedUrl = requestedUrl,
         config = config,
         isFullscreen = isFullscreen,
         requestedNavigationId = requestedNavigationId,
@@ -72,7 +72,7 @@ fun WebViewHost(
 
 @Composable
 fun WebViewHost(
-    url: String?,
+    requestedUrl: String?,
     config: WebTestConfig,
     isFullscreen: Boolean,
     requestedNavigationId: Long,
@@ -118,7 +118,7 @@ fun WebViewHost(
             controller.attach(webView)
             WebViewSettingsApplier.apply(webView = webView, config = config)
 
-            val requestedNavigation = loadedNavigationKey(url, requestedNavigationId)
+            val requestedNavigation = loadedNavigationKey(requestedUrl, requestedNavigationId)
             if (requestedNavigation != null && requestedNavigation != lastLoadedNavigation) {
                 lastLoadedNavigation = requestedNavigation
                 if (config.cacheMode == WebCacheMode.CLEAR_BEFORE_LOAD) {

@@ -11,6 +11,7 @@ data class WorkbenchState(
     val selectedPanel: WorkbenchPanel = WorkbenchPanel.CONFIG,
     val isLoading: Boolean = false,
     val loadProgress: Int = 0,
+    val requestedUrl: String? = null,
     val requestedNavigationId: Long = 0,
     val activeNavigationId: Long = 0,
     val activeNavigationCompleted: Boolean = false,

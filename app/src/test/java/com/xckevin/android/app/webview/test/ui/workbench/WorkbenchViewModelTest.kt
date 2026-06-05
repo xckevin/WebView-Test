@@ -53,12 +53,13 @@ class WorkbenchViewModelTest {
         assertEquals("https://example.com", state.urlInput)
         assertEquals("", state.currentTitle)
         assertTrue(state.isLoading)
+        assertEquals("https://example.com", state.requestedUrl)
         assertEquals(1L, state.requestedNavigationId)
         assertEquals(1L, state.activeNavigationId)
         assertNull(state.urlError)
     }
 
-    @Test fun explicitLoadChangesRequestedNavigationId() = runTest {
+    @Test fun explicitLoadChangesRequestedUrlAndNavigationId() = runTest {
         val viewModel = viewModel()
 
         viewModel.loadUrl("https://first.example.com")
@@ -66,7 +67,9 @@ class WorkbenchViewModelTest {
         viewModel.loadUrl("https://second.example.com")
         val secondState = viewModel.state.value
 
+        assertEquals("https://first.example.com", firstState.requestedUrl)
         assertEquals(1L, firstState.requestedNavigationId)
+        assertEquals("https://second.example.com", secondState.requestedUrl)
         assertEquals(2L, secondState.requestedNavigationId)
         assertEquals(2L, secondState.activeNavigationId)
     }
@@ -143,6 +146,7 @@ class WorkbenchViewModelTest {
         assertEquals("https://saved.example.com/path", state.urlInput)
         assertEquals("", state.currentTitle)
         assertEquals(openedConfig, state.config)
+        assertEquals("https://saved.example.com/path", state.requestedUrl)
         assertEquals(2L, state.requestedNavigationId)
         assertEquals(2L, state.activeNavigationId)
         assertEquals(testCase.copy(lastOpenedAt = 2000L), testCaseRepository.upsertedCases.single())
@@ -219,12 +223,13 @@ class WorkbenchViewModelTest {
         assertEquals("", state.currentTitle)
         assertTrue(state.isLoading)
         assertEquals(0, state.loadProgress)
+        assertEquals("https://initial.example.com", state.requestedUrl)
         assertEquals(1L, state.requestedNavigationId)
         assertEquals(2L, state.activeNavigationId)
         assertFalse(state.activeNavigationCompleted)
     }
 
-    @Test fun observedPageStartedDoesNotChangeRequestedNavigationId() = runTest {
+    @Test fun observedPageStartedDoesNotChangeRequestedUrlOrNavigationId() = runTest {
         val viewModel = viewModel()
 
         viewModel.loadUrl("https://initial.example.com")
@@ -237,6 +242,7 @@ class WorkbenchViewModelTest {
 
         val state = viewModel.state.value
         assertEquals("https://clicked.example.com", state.currentUrl)
+        assertEquals("https://initial.example.com", state.requestedUrl)
         assertEquals(1L, state.requestedNavigationId)
         assertEquals(2L, state.activeNavigationId)
     }
@@ -348,6 +354,7 @@ class WorkbenchViewModelTest {
         val state = viewModel.state.value
         assertEquals("https://redirected.example.com/path", state.currentUrl)
         assertEquals("https://redirected.example.com/path", state.urlInput)
+        assertEquals("https://active.example.com", state.requestedUrl)
         assertEquals("Redirected title", state.currentTitle)
         assertFalse(state.isLoading)
         assertEquals(
