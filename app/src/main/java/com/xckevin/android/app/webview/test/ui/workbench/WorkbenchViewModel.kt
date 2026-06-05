@@ -42,6 +42,7 @@ class WorkbenchViewModel(
             it.copy(
                 urlInput = normalizedUrl,
                 currentUrl = normalizedUrl,
+                currentTitle = "",
                 isLoading = true,
                 loadProgress = 0,
                 urlError = null,
@@ -87,6 +88,7 @@ class WorkbenchViewModel(
             it.copy(
                 urlInput = testCase.url,
                 currentUrl = testCase.url,
+                currentTitle = "",
                 config = testCase.config,
                 isLoading = true,
                 loadProgress = 0,
@@ -101,6 +103,7 @@ class WorkbenchViewModel(
     fun onWebPageEvent(event: WebPageEvent) {
         when (event) {
             is WebPageEvent.PageStarted -> {
+                if (!event.url.isActiveEventUrl(allowMissingActiveUrl = true)) return
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
@@ -114,6 +117,7 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.PageFinished -> {
+                if (!event.url.isActiveEventUrl()) return
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
@@ -138,6 +142,7 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.ProgressChanged -> {
+                if (!state.value.isLoading) return
                 _state.update {
                     it.copy(
                         loadProgress = event.progress.coerceIn(0, 100),
@@ -158,4 +163,9 @@ class WorkbenchViewModel(
 
     private fun DebugState.withLog(message: String): DebugState =
         copy(logs = logs + DebugLogEntry(message = message, timestamp = clock()))
+
+    private fun String.isActiveEventUrl(allowMissingActiveUrl: Boolean = false): Boolean {
+        val currentUrl = state.value.currentUrl
+        return (currentUrl == null && allowMissingActiveUrl) || this == currentUrl
+    }
 }

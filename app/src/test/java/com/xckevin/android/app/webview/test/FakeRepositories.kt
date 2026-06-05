@@ -6,6 +6,7 @@ import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.WebTestCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 class FakeTestCaseRepository(
     initialCases: List<WebTestCase> = emptyList(),
@@ -45,7 +46,7 @@ class FakeHistoryRepository(
     var clearCount = 0
 
     override fun observeRecent(limit: Int): Flow<List<HistoryItem>> =
-        MutableStateFlow(items.value.take(limit))
+        items.map { it.take(limit) }
 
     override suspend fun insert(item: HistoryItem): Long {
         insertedItems += item
