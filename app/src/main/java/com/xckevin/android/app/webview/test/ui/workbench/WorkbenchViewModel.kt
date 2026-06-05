@@ -137,11 +137,12 @@ class WorkbenchViewModel(
 
             is WebPageEvent.PageFinished -> {
                 if (!event.navigationId.isCurrentLoadingNavigation()) return
+                val title = event.title.orEmpty()
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
                         urlInput = event.url,
-                        currentTitle = event.title,
+                        currentTitle = title,
                         isLoading = false,
                         loadProgress = 100,
                         activeNavigationCompleted = true,
@@ -153,7 +154,7 @@ class WorkbenchViewModel(
                         HistoryItem(
                             id = 0L,
                             url = event.url,
-                            title = event.title,
+                            title = title,
                             sourceType = SourceType.REMOTE_URL,
                             visitedAt = clock(),
                         )
@@ -168,6 +169,38 @@ class WorkbenchViewModel(
                         loadProgress = event.progress.coerceIn(0, 100),
                         debugState = it.debugState.withLog("Progress changed: ${event.progress}"),
                     )
+                }
+            }
+
+            is WebPageEvent.Console -> {
+                _state.update {
+                    it.copy(debugState = it.debugState.withLog("Console ${event.level}: ${event.message}"))
+                }
+            }
+
+            is WebPageEvent.LoadError -> {
+                _state.update {
+                    it.copy(debugState = it.debugState.withLog("Load error ${event.code}: ${event.description}"))
+                }
+            }
+
+            is WebPageEvent.HttpError -> {
+                _state.update {
+                    it.copy(debugState = it.debugState.withLog("HTTP error ${event.statusCode}: ${event.reason}"))
+                }
+            }
+
+            is WebPageEvent.SslError -> {
+                _state.update {
+                    it.copy(debugState = it.debugState.withLog("SSL error: ${event.primaryError}"))
+                }
+            }
+
+            is WebPageEvent.ResourceRequest -> Unit
+
+            is WebPageEvent.DownloadRequested -> {
+                _state.update {
+                    it.copy(debugState = it.debugState.withLog("Download requested: ${event.url}"))
                 }
             }
         }
