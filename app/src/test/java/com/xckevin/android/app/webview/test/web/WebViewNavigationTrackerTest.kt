@@ -147,6 +147,18 @@ class WebViewNavigationTrackerTest {
         assertEquals(1L, tracker.onPageFinished("https://example.com/a"))
     }
 
+    @Test fun sameUrlHttpErrorLookupUsesActiveReloadNavigationId() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+
+        assertEquals(2L, tracker.navigationIdForHttpError("https://example.com/a"))
+        assertEquals(2L, tracker.onPageFinished("https://example.com/a"))
+    }
+
     @Test fun subresourceErrorActiveIdReadDoesNotConsumePageFinishNavigationId() {
         val tracker = WebViewNavigationTracker()
 
@@ -157,7 +169,7 @@ class WebViewNavigationTrackerTest {
         assertEquals(1L, tracker.onPageFinished("https://example.com/a"))
     }
 
-    @Test fun repeatedSameUrlFinishesConsumeNavigationIdsInStartOrder() {
+    @Test fun sameUrlFinishCompletesActiveReloadWhenPreviousStartWasCancelled() {
         val tracker = WebViewNavigationTracker()
 
         tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
@@ -165,8 +177,19 @@ class WebViewNavigationTrackerTest {
         tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/a")
         tracker.onPageStarted("https://example.com/a")
 
-        assertEquals(1L, tracker.onPageFinished("https://example.com/a"))
         assertEquals(2L, tracker.onPageFinished("https://example.com/a"))
+        assertNull(tracker.onPageFinished("https://example.com/a"))
+    }
+
+    @Test fun sameUrlErrorCompletesActiveReloadWhenPreviousStartWasCancelled() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+
+        assertEquals(2L, tracker.onNavigationError("https://example.com/a"))
         assertNull(tracker.onPageFinished("https://example.com/a"))
     }
 

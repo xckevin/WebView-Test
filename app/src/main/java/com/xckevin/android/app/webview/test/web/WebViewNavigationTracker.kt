@@ -68,6 +68,18 @@ class WebViewNavigationTracker {
     private fun completeNavigation(url: String): Long? {
         val normalizedUrl = NavigationUrl.normalize(url)
         val startedNavigationIds = startedNavigationIdsByUrl[normalizedUrl]
+        val activeNavigationMatches = activeNavigationMatches(url)
+        val activeNavigationIndex = startedNavigationIds?.indexOf(activeNavigationId) ?: -1
+        if (activeNavigationMatches && activeNavigationIndex >= 0) {
+            val matchingStartedNavigationIds = checkNotNull(startedNavigationIds)
+            matchingStartedNavigationIds.subList(0, activeNavigationIndex + 1).clear()
+            if (matchingStartedNavigationIds.isEmpty()) {
+                startedNavigationIdsByUrl.remove(normalizedUrl)
+            }
+            activeNavigationCompleted = true
+            return activeNavigationId
+        }
+
         val startedNavigationId = startedNavigationIds?.removeFirstOrNull()
         if (startedNavigationId != null) {
             if (startedNavigationIds.isEmpty()) {
@@ -79,13 +91,7 @@ class WebViewNavigationTracker {
             return startedNavigationId
         }
 
-        if (
-            activeNavigationId > 0L &&
-            !activeNavigationCompleted &&
-            activeNavigationUrl?.let { activeUrl ->
-                NavigationUrl.matches(activeUrl, url)
-            } == true
-        ) {
+        if (activeNavigationMatches) {
             activeNavigationCompleted = true
             return activeNavigationId
         }
@@ -121,19 +127,25 @@ class WebViewNavigationTracker {
     }
 
     private fun findNavigation(url: String): Long? {
+        if (activeNavigationMatches(url)) {
+            return activeNavigationId
+        }
+
         val normalizedUrl = NavigationUrl.normalize(url)
         val startedNavigationId = startedNavigationIdsByUrl[normalizedUrl]?.firstOrNull()
         if (startedNavigationId != null) {
             return startedNavigationId
         }
 
-        return activeNavigationId.takeIf {
-            it > 0L &&
-                !activeNavigationCompleted &&
-                activeNavigationUrl?.let { activeUrl ->
-                    NavigationUrl.matches(activeUrl, url)
-                } == true
-        }
+        return null
+    }
+
+    private fun activeNavigationMatches(url: String): Boolean {
+        return activeNavigationId > 0L &&
+            !activeNavigationCompleted &&
+            activeNavigationUrl?.let { activeUrl ->
+                NavigationUrl.matches(activeUrl, url)
+            } == true
     }
 
     private data class PendingExplicitNavigation(
