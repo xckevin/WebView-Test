@@ -1,0 +1,161 @@
+package com.xckevin.android.app.webview.test.ui.workbench
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.xckevin.android.app.webview.test.data.HistoryRepository
+import com.xckevin.android.app.webview.test.data.TestCaseRepository
+import com.xckevin.android.app.webview.test.debug.DebugLogEntry
+import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.model.HistoryItem
+import com.xckevin.android.app.webview.test.model.SourceType
+import com.xckevin.android.app.webview.test.model.WebTestCase
+import com.xckevin.android.app.webview.test.model.WebTestConfig
+import com.xckevin.android.app.webview.test.util.UrlNormalizer
+import com.xckevin.android.app.webview.test.web.WebPageEvent
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+class WorkbenchViewModel(
+    private val testCaseRepository: TestCaseRepository,
+    private val historyRepository: HistoryRepository,
+    private val clock: () -> Long = { System.currentTimeMillis() },
+) : ViewModel() {
+    private val _state = MutableStateFlow(WorkbenchState())
+    val state: StateFlow<WorkbenchState> = _state.asStateFlow()
+
+    fun onUrlInputChanged(value: String) {
+        _state.update { it.copy(urlInput = value, urlError = null) }
+    }
+
+    fun loadUrl() {
+        val rawUrl = state.value.urlInput
+        val normalizedUrl = UrlNormalizer.normalizeRemoteUrl(rawUrl)
+        if (normalizedUrl == null) {
+            _state.update { it.copy(urlError = "Enter a valid http or https URL") }
+            return
+        }
+
+        _state.update {
+            it.copy(
+                urlInput = normalizedUrl,
+                currentUrl = normalizedUrl,
+                isLoading = true,
+                loadProgress = 0,
+                urlError = null,
+            )
+        }
+    }
+
+    fun loadUrl(rawUrl: String) {
+        onUrlInputChanged(rawUrl)
+        loadUrl()
+    }
+
+    fun applyConfig(config: WebTestConfig) {
+        _state.update { it.copy(config = config) }
+    }
+
+    fun saveCurrentAsCase(name: String, note: String) {
+        val currentState = state.value
+        val currentUrl = currentState.currentUrl
+        if (currentUrl == null) {
+            _state.update { it.copy(urlError = "Load a valid URL before saving a case") }
+            return
+        }
+
+        val now = clock()
+        val testCase = WebTestCase(
+            id = 0L,
+            name = name,
+            url = currentUrl,
+            note = note,
+            config = currentState.config,
+            createdAt = now,
+            updatedAt = now,
+            lastOpenedAt = null,
+        )
+        viewModelScope.launch {
+            testCaseRepository.upsert(testCase)
+        }
+    }
+
+    fun openCase(testCase: WebTestCase) {
+        _state.update {
+            it.copy(
+                urlInput = testCase.url,
+                currentUrl = testCase.url,
+                config = testCase.config,
+                isLoading = true,
+                loadProgress = 0,
+                urlError = null,
+            )
+        }
+        viewModelScope.launch {
+            testCaseRepository.upsert(testCase.copy(lastOpenedAt = clock()))
+        }
+    }
+
+    fun onWebPageEvent(event: WebPageEvent) {
+        when (event) {
+            is WebPageEvent.PageStarted -> {
+                _state.update {
+                    it.copy(
+                        currentUrl = event.url,
+                        urlInput = event.url,
+                        currentTitle = "",
+                        isLoading = true,
+                        loadProgress = 0,
+                        debugState = it.debugState.withLog("Page started: ${event.url}"),
+                    )
+                }
+            }
+
+            is WebPageEvent.PageFinished -> {
+                _state.update {
+                    it.copy(
+                        currentUrl = event.url,
+                        urlInput = event.url,
+                        currentTitle = event.title,
+                        isLoading = false,
+                        loadProgress = 100,
+                        debugState = it.debugState.withLog("Page finished: ${event.url}"),
+                    )
+                }
+                viewModelScope.launch {
+                    historyRepository.insert(
+                        HistoryItem(
+                            id = 0L,
+                            url = event.url,
+                            title = event.title,
+                            sourceType = SourceType.REMOTE_URL,
+                            visitedAt = clock(),
+                        )
+                    )
+                }
+            }
+
+            is WebPageEvent.ProgressChanged -> {
+                _state.update {
+                    it.copy(
+                        loadProgress = event.progress.coerceIn(0, 100),
+                        debugState = it.debugState.withLog("Progress changed: ${event.progress}"),
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearDebugLogs() {
+        _state.update { it.copy(debugState = DebugState()) }
+    }
+
+    fun toggleFullscreen() {
+        _state.update { it.copy(isFullscreen = !it.isFullscreen) }
+    }
+
+    private fun DebugState.withLog(message: String): DebugState =
+        copy(logs = logs + DebugLogEntry(message = message, timestamp = clock()))
+}
