@@ -19,14 +19,31 @@ data class AppSettings(
     val autoLoadScannedUrl: Boolean,
     val startInFullscreen: Boolean,
     val defaultConfig: WebTestConfig,
-)
+) {
+    companion object {
+        fun default() = AppSettings(
+            webContentsDebuggingEnabled = false,
+            autoLoadScannedUrl = true,
+            startInFullscreen = false,
+            defaultConfig = WebTestConfig.default(),
+        )
+    }
+}
+
+interface SettingsRepository {
+    val settings: Flow<AppSettings>
+    suspend fun setWebContentsDebuggingEnabled(enabled: Boolean)
+    suspend fun setAutoLoadScannedUrl(enabled: Boolean)
+    suspend fun setStartInFullscreen(enabled: Boolean)
+    suspend fun setDefaultConfig(config: WebTestConfig)
+}
 
 private val Context.appSettingsDataStore by preferencesDataStore(name = "app_settings")
 
-class AppSettingsStore(context: Context) {
+class AppSettingsStore(context: Context) : SettingsRepository {
     private val dataStore = context.applicationContext.appSettingsDataStore
 
-    val settings: Flow<AppSettings> = dataStore.data
+    override val settings: Flow<AppSettings> = dataStore.data
         .catch { error ->
             if (error is IOException) {
                 emit(emptyPreferences())
@@ -46,25 +63,25 @@ class AppSettingsStore(context: Context) {
             )
         }
 
-    suspend fun setWebContentsDebuggingEnabled(enabled: Boolean) {
+    override suspend fun setWebContentsDebuggingEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.WEB_CONTENTS_DEBUGGING_ENABLED] = enabled
         }
     }
 
-    suspend fun setAutoLoadScannedUrl(enabled: Boolean) {
+    override suspend fun setAutoLoadScannedUrl(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.AUTO_LOAD_SCANNED_URL] = enabled
         }
     }
 
-    suspend fun setStartInFullscreen(enabled: Boolean) {
+    override suspend fun setStartInFullscreen(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.START_IN_FULLSCREEN] = enabled
         }
     }
 
-    suspend fun setDefaultConfig(config: WebTestConfig) {
+    override suspend fun setDefaultConfig(config: WebTestConfig) {
         dataStore.edit { preferences ->
             preferences[Keys.DEFAULT_CONFIG] = json.encodeToString(config)
         }

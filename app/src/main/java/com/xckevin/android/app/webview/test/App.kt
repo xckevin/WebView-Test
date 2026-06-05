@@ -1,11 +1,14 @@
 package com.xckevin.android.app.webview.test
 
+import android.webkit.WebView
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.xckevin.android.app.webview.test.data.AppSettings
 import com.xckevin.android.app.webview.test.ui.navigation.ScannerRoute
 import com.xckevin.android.app.webview.test.ui.navigation.SettingsRoute
 import com.xckevin.android.app.webview.test.ui.navigation.WorkbenchRoute
@@ -18,6 +21,11 @@ private const val SCAN_RESULT_KEY = "scanResult"
 @Composable
 fun WebViewTestApp(container: AppContainer) {
     val navController = rememberNavController()
+    val appSettings by container.settingsStore.settings.collectAsStateWithLifecycle(AppSettings.default())
+
+    LaunchedEffect(appSettings.webContentsDebuggingEnabled) {
+        WebView.setWebContentsDebuggingEnabled(appSettings.webContentsDebuggingEnabled)
+    }
 
     NavHost(navController = navController, startDestination = WorkbenchRoute) {
         composable<WorkbenchRoute> { backStackEntry ->
