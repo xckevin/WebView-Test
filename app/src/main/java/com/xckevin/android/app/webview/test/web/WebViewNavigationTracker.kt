@@ -21,10 +21,14 @@ class WebViewNavigationTracker {
 
     @Synchronized
     fun onPageStarted(url: String): Long {
-        val pendingNavigation = pendingExplicitNavigations.firstOrNull()
+        val pendingNavigationIndex = pendingExplicitNavigations.indexOfFirst { it.matches(url) }
+        val pendingNavigation = pendingNavigationIndex.takeIf { it >= 0 }?.let { index ->
+            val navigation = pendingExplicitNavigations[index]
+            pendingExplicitNavigations.subList(0, index + 1).clear()
+            navigation
+        }
 
-        val navigationId = if (pendingNavigation?.matches(url) == true) {
-            pendingExplicitNavigations.removeAt(0)
+        val navigationId = if (pendingNavigation != null) {
             pendingNavigation.navigationId
         } else {
             nextFallbackNavigationId++

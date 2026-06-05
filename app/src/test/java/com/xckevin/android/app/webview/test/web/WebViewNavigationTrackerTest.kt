@@ -72,6 +72,25 @@ class WebViewNavigationTrackerTest {
         assertEquals(2L, tracker.onPageStarted("https://example.com/a"))
     }
 
+    @Test fun skippedPendingExplicitNavigationDoesNotBlockLaterMatchingStart() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/b")
+
+        assertEquals(2L, tracker.onPageStarted("https://example.com/b"))
+    }
+
+    @Test fun skippedPendingExplicitNavigationIsDiscardedAfterLaterMatch() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/b")
+        tracker.onPageStarted("https://example.com/b")
+
+        assertEquals(3L, tracker.onPageStarted("https://example.com/a"))
+    }
+
     @Test fun lateFinishUsesNavigationIdFromOriginalStart() {
         val tracker = WebViewNavigationTracker()
 
