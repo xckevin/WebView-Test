@@ -12,6 +12,7 @@ data class WorkbenchState(
     val isLoading: Boolean = false,
     val loadProgress: Int = 0,
     val activeNavigationId: Long = 0,
+    val activeNavigationCompleted: Boolean = false,
     val isFullscreen: Boolean = false,
     val urlError: String? = null,
     val debugState: DebugState = DebugState(),

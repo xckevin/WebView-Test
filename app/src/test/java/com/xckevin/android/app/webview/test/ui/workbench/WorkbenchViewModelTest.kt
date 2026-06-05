@@ -186,6 +186,118 @@ class WorkbenchViewModelTest {
         )
     }
 
+    @Test fun newerPageStartedBecomesActiveNavigation() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://initial.example.com")
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 70, navigationId = 1L))
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://clicked.example.com",
+                navigationId = 2L,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertEquals("https://clicked.example.com", state.currentUrl)
+        assertEquals("https://clicked.example.com", state.urlInput)
+        assertEquals("", state.currentTitle)
+        assertTrue(state.isLoading)
+        assertEquals(0, state.loadProgress)
+        assertEquals(2L, state.activeNavigationId)
+        assertFalse(state.activeNavigationCompleted)
+    }
+
+    @Test fun olderPageStartedIsIgnored() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://initial.example.com")
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://clicked.example.com",
+                navigationId = 2L,
+            )
+        )
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://old.example.com",
+                navigationId = 1L,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertEquals("https://clicked.example.com", state.currentUrl)
+        assertEquals("https://clicked.example.com", state.urlInput)
+        assertEquals(2L, state.activeNavigationId)
+    }
+
+    @Test fun lateSameNavigationProgressAfterFinishIsIgnored() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 70, navigationId = navigationId))
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "https://active.example.com",
+                navigationId = navigationId,
+                title = "Active title",
+            )
+        )
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 20, navigationId = navigationId))
+
+        val state = viewModel.state.value
+        assertEquals(100, state.loadProgress)
+        assertFalse(state.isLoading)
+        assertTrue(state.activeNavigationCompleted)
+    }
+
+    @Test fun duplicateSameNavigationFinishDoesNotInsertDuplicateHistory() = runTest {
+        val viewModel = viewModel(clock = { 4100L })
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        val finishEvent = WebPageEvent.PageFinished(
+            url = "https://active.example.com",
+            navigationId = navigationId,
+            title = "Active title",
+        )
+        viewModel.onWebPageEvent(finishEvent)
+        viewModel.onWebPageEvent(finishEvent)
+        advanceUntilIdle()
+
+        assertEquals(1, historyRepository.insertedItems.size)
+        assertEquals("https://active.example.com", historyRepository.insertedItems.single().url)
+    }
+
+    @Test fun zeroNavigationIdEventsAreIgnored() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://zero.example.com",
+                navigationId = 0L,
+            )
+        )
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 50, navigationId = 0L))
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "https://zero.example.com",
+                navigationId = 0L,
+                title = "Zero",
+            )
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertNull(state.currentUrl)
+        assertEquals("", state.urlInput)
+        assertEquals(0, state.loadProgress)
+        assertEquals(0L, state.activeNavigationId)
+        assertFalse(state.isLoading)
+        assertEquals(emptyList<HistoryItem>(), historyRepository.insertedItems)
+    }
+
     @Test fun currentPageFinishedWithDifferentUrlUpdatesStateAndHistory() = runTest {
         val viewModel = viewModel(clock = { 5000L })
 

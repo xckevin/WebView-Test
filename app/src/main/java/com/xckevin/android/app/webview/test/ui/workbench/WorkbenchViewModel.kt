@@ -48,6 +48,7 @@ class WorkbenchViewModel(
                 isLoading = true,
                 loadProgress = 0,
                 activeNavigationId = navigationId,
+                activeNavigationCompleted = false,
                 urlError = null,
             )
         }
@@ -97,6 +98,7 @@ class WorkbenchViewModel(
                 isLoading = true,
                 loadProgress = 0,
                 activeNavigationId = navigationId,
+                activeNavigationCompleted = false,
                 urlError = null,
             )
         }
@@ -108,7 +110,17 @@ class WorkbenchViewModel(
     fun onWebPageEvent(event: WebPageEvent) {
         when (event) {
             is WebPageEvent.PageStarted -> {
-                if (!event.navigationId.isActiveNavigationId()) return
+                val currentState = state.value
+                if (event.navigationId <= 0L) return
+                if (event.navigationId < currentState.activeNavigationId) return
+                if (
+                    event.navigationId == currentState.activeNavigationId &&
+                    currentState.activeNavigationCompleted
+                ) {
+                    return
+                }
+
+                nextNavigationId = maxOf(nextNavigationId, event.navigationId + 1)
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
@@ -116,13 +128,15 @@ class WorkbenchViewModel(
                         currentTitle = "",
                         isLoading = true,
                         loadProgress = 0,
+                        activeNavigationId = event.navigationId,
+                        activeNavigationCompleted = false,
                         debugState = it.debugState.withLog("Page started: ${event.url}"),
                     )
                 }
             }
 
             is WebPageEvent.PageFinished -> {
-                if (!event.navigationId.isActiveNavigationId()) return
+                if (!event.navigationId.isCurrentLoadingNavigation()) return
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
@@ -130,6 +144,7 @@ class WorkbenchViewModel(
                         currentTitle = event.title,
                         isLoading = false,
                         loadProgress = 100,
+                        activeNavigationCompleted = true,
                         debugState = it.debugState.withLog("Page finished: ${event.url}"),
                     )
                 }
@@ -147,7 +162,7 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.ProgressChanged -> {
-                if (!event.navigationId.isActiveNavigationId()) return
+                if (!event.navigationId.isCurrentLoadingNavigation()) return
                 _state.update {
                     it.copy(
                         loadProgress = event.progress.coerceIn(0, 100),
@@ -171,5 +186,11 @@ class WorkbenchViewModel(
 
     private fun nextNavigationId(): Long = nextNavigationId++
 
-    private fun Long.isActiveNavigationId(): Boolean = this == state.value.activeNavigationId
+    private fun Long.isCurrentLoadingNavigation(): Boolean {
+        val currentState = state.value
+        return this > 0L &&
+            this == currentState.activeNavigationId &&
+            currentState.isLoading &&
+            !currentState.activeNavigationCompleted
+    }
 }
