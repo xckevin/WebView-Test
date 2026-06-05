@@ -11,14 +11,16 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 
 class TestWebViewClient(
-    private val navigationId: Long,
+    private val navigationTracker: WebViewNavigationTracker,
     private val onEvent: (WebPageEvent) -> Unit,
 ) : WebViewClient() {
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+        val navigationId = navigationTracker.onPageStarted(url.orEmpty())
         emit(view, WebPageEvent.PageStarted(navigationId = navigationId, url = url.orEmpty()))
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
+        val navigationId = navigationTracker.activeNavigationId()
         emit(
             view,
             WebPageEvent.PageFinished(
@@ -40,6 +42,7 @@ class TestWebViewClient(
                 url = request?.url?.toString(),
                 code = error?.errorCode ?: 0,
                 description = error?.description?.toString().orEmpty(),
+                navigationId = navigationTracker.activeNavigationId(),
             )
         )
     }
@@ -55,6 +58,7 @@ class TestWebViewClient(
                 url = request?.url?.toString(),
                 statusCode = errorResponse?.statusCode ?: 0,
                 reason = errorResponse?.reasonPhrase.orEmpty(),
+                navigationId = navigationTracker.activeNavigationId(),
             )
         )
     }
@@ -66,6 +70,7 @@ class TestWebViewClient(
             WebPageEvent.SslError(
                 url = error?.url,
                 primaryError = error?.primaryError ?: 0,
+                navigationId = navigationTracker.activeNavigationId(),
             )
         )
     }
@@ -81,6 +86,7 @@ class TestWebViewClient(
                 WebPageEvent.ResourceRequest(
                     url = url,
                     isMainFrame = request.isForMainFrame,
+                    navigationId = navigationTracker.activeNavigationId(),
                 )
             )
         }

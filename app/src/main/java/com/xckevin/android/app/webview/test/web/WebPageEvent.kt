@@ -9,16 +9,36 @@ sealed interface WebPageEvent {
         val message: String,
         val sourceId: String,
         val lineNumber: Int,
+        val navigationId: Long = 0L,
     ) : WebPageEvent
-    data class LoadError(val url: String?, val code: Int, val description: String) : WebPageEvent
-    data class HttpError(val url: String?, val statusCode: Int, val reason: String) : WebPageEvent
-    data class SslError(val url: String?, val primaryError: Int) : WebPageEvent
-    data class ResourceRequest(val url: String, val isMainFrame: Boolean) : WebPageEvent
+    data class LoadError(
+        val url: String?,
+        val code: Int,
+        val description: String,
+        val navigationId: Long = 0L,
+    ) : WebPageEvent
+    data class HttpError(
+        val url: String?,
+        val statusCode: Int,
+        val reason: String,
+        val navigationId: Long = 0L,
+    ) : WebPageEvent
+    data class SslError(
+        val url: String?,
+        val primaryError: Int,
+        val navigationId: Long = 0L,
+    ) : WebPageEvent
+    data class ResourceRequest(
+        val url: String,
+        val isMainFrame: Boolean,
+        val navigationId: Long = 0L,
+    ) : WebPageEvent
     data class DownloadRequested(
         val url: String,
         val userAgent: String?,
         val contentDisposition: String?,
         val mimeType: String?,
         val contentLength: Long,
+        val navigationId: Long = 0L,
     ) : WebPageEvent
 }

@@ -5,11 +5,16 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 
 class TestWebChromeClient(
-    private val navigationId: Long,
+    private val navigationTracker: WebViewNavigationTracker,
     private val onEvent: (WebPageEvent) -> Unit,
 ) : WebChromeClient() {
     override fun onProgressChanged(view: WebView?, newProgress: Int) {
-        onEvent(WebPageEvent.ProgressChanged(navigationId = navigationId, progress = newProgress))
+        onEvent(
+            WebPageEvent.ProgressChanged(
+                navigationId = navigationTracker.activeNavigationId(),
+                progress = newProgress,
+            )
+        )
     }
 
     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
@@ -21,6 +26,7 @@ class TestWebChromeClient(
                 message = consoleMessage.message().orEmpty(),
                 sourceId = consoleMessage.sourceId().orEmpty(),
                 lineNumber = consoleMessage.lineNumber(),
+                navigationId = navigationTracker.activeNavigationId(),
             )
         )
         return true
