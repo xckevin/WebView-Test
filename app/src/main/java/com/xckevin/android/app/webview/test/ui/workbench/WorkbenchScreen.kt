@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +50,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun WorkbenchScreen(
     container: AppContainer,
+    scanResult: String? = null,
+    onScanResultConsumed: () -> Unit = {},
     onOpenScanner: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -88,6 +91,12 @@ fun WorkbenchScreen(
     val clearWebViewCache: () -> Unit = {
         webViewController.clearCache()
         viewModel.addDebugMessage("WebView cache cleared")
+    }
+
+    LaunchedEffect(scanResult) {
+        val result = scanResult ?: return@LaunchedEffect
+        viewModel.loadUrl(result)
+        onScanResultConsumed()
     }
 
     val importCasesFromClipboard: () -> Unit = {

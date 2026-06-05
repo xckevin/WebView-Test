@@ -1,34 +1,362 @@
 package com.xckevin.android.app.webview.test.ui.scanner
 
+import android.Manifest
+import android.content.ClipData
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.xckevin.android.app.webview.test.R
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.toClipEntry
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xckevin.android.app.webview.test.scanner.BarcodeAnalyzer
+import com.xckevin.android.app.webview.test.scanner.ParsedScanResult
+import com.xckevin.android.app.webview.test.scanner.ScannerViewModel
 import com.xckevin.android.app.webview.test.ui.common.AppScaffold
+import java.util.concurrent.Executors
+import kotlinx.coroutines.launch
 
 @Composable
 fun ScannerScreen(
     onResult: (String) -> Unit,
     onClose: () -> Unit,
 ) {
+    val viewModel: ScannerViewModel = viewModel()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = viewModel::onCameraPermissionResult,
+    )
+
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            viewModel.onCameraPermissionResult(true)
+        } else {
+            launcher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    LaunchedEffect(state.parsedResult) {
+        val url = (state.parsedResult as? ParsedScanResult.Url)?.normalizedUrl
+        if (url != null) {
+            onResult(url)
+        }
+    }
+
     AppScaffold { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
         ) {
-            Text(text = stringResource(R.string.screen_scanner))
-            Button(onClick = onClose) {
-                Text(text = stringResource(R.string.action_close))
+            when {
+                state.cameraPermissionGranted == null -> ScannerStatus(
+                    title = "Opening camera",
+                    detail = "Waiting for camera permission.",
+                    onClose = onClose,
+                )
+
+                state.cameraPermissionGranted == false -> ScannerStatus(
+                    title = "Camera permission denied",
+                    detail = "Camera access is required to scan a barcode.",
+                    onClose = onClose,
+                )
+
+                state.parsedResult is ParsedScanResult.Text -> TextScanResult(
+                    result = state.parsedResult as ParsedScanResult.Text,
+                    editableUrl = state.editableUrl,
+                    editError = state.editError,
+                    onEditableUrlChanged = viewModel::onEditableUrlChanged,
+                    onUseAsUrl = viewModel::useEditedTextAsUrl,
+                    onClose = onClose,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                state.cameraError != null -> ScannerStatus(
+                    title = "Camera unavailable",
+                    detail = state.cameraError.orEmpty(),
+                    onClose = onClose,
+                )
+
+                else -> CameraScanner(
+                    onBarcode = viewModel::onRawScanValue,
+                    onCameraError = viewModel::onCameraError,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            ScannerTopBar(
+                onClose = onClose,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CameraScanner(
+    onBarcode: (String) -> Unit,
+    onCameraError: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+    val currentOnBarcode = rememberUpdatedState(onBarcode)
+    val analyzer = remember {
+        BarcodeAnalyzer(onBarcode = { rawValue -> currentOnBarcode.value(rawValue) })
+    }
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            analyzer.close()
+            cameraExecutor.shutdown()
+        }
+    }
+
+    CameraBindingEffect(
+        previewView = previewView,
+        lifecycleOwner = lifecycleOwner,
+        analyzer = analyzer,
+        cameraExecutor = cameraExecutor,
+        onCameraError = onCameraError,
+    )
+
+    AndroidView(
+        factory = { previewView },
+        modifier = modifier.background(Color.Black),
+    )
+}
+
+@Composable
+private fun CameraBindingEffect(
+    previewView: PreviewView,
+    lifecycleOwner: LifecycleOwner,
+    analyzer: BarcodeAnalyzer,
+    cameraExecutor: java.util.concurrent.ExecutorService,
+    onCameraError: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val currentOnCameraError by rememberUpdatedState(onCameraError)
+
+    DisposableEffect(previewView, lifecycleOwner, analyzer, cameraExecutor) {
+        var disposed = false
+        var cameraProvider: ProcessCameraProvider? = null
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        cameraProviderFuture.addListener(
+            {
+                val provider = runCatching { cameraProviderFuture.get() }
+                    .onFailure { error ->
+                        currentOnCameraError(error.message ?: "Unable to open the camera.")
+                    }
+                    .getOrNull() ?: return@addListener
+                cameraProvider = provider
+                if (disposed) {
+                    provider.unbindAll()
+                    return@addListener
+                }
+
+                val preview = Preview.Builder()
+                    .build()
+                    .also { it.surfaceProvider = previewView.surfaceProvider }
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { it.setAnalyzer(cameraExecutor, analyzer) }
+
+                runCatching {
+                    provider.unbindAll()
+                    provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        imageAnalysis,
+                    )
+                }.onFailure { error ->
+                    currentOnCameraError(error.message ?: "Unable to bind the camera preview.")
+                }
+            },
+            ContextCompat.getMainExecutor(context),
+        )
+
+        onDispose {
+            disposed = true
+            cameraProvider?.unbindAll()
+        }
+    }
+}
+
+@Composable
+private fun ScannerTopBar(
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.54f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Scanner",
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        OutlinedButton(onClick = onClose) {
+            Text("Close")
+        }
+    }
+}
+
+@Composable
+private fun ScannerStatus(
+    title: String,
+    detail: String,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = detail,
+                modifier = Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(
+                onClick = onClose,
+                modifier = Modifier.padding(top = 16.dp),
+            ) {
+                Text("Close")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextScanResult(
+    result: ParsedScanResult.Text,
+    editableUrl: String,
+    editError: String?,
+    onEditableUrlChanged: (String) -> Unit,
+    onUseAsUrl: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
+    var copied by remember { mutableStateOf(false) }
+
+    Surface(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Scanned text",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = result.value,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            OutlinedTextField(
+                value = editableUrl,
+                onValueChange = onEditableUrlChanged,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Use as URL") },
+                singleLine = true,
+                isError = editError != null,
+                supportingText = editError?.let { { Text(it) } },
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            clipboard.setClipEntry(
+                                ClipData.newPlainText("scan-result", result.value).toClipEntry()
+                            )
+                            copied = true
+                        }
+                    },
+                ) {
+                    Text(if (copied) "Copied" else "Copy")
+                }
+                Button(onClick = onUseAsUrl) {
+                    Text("Use as URL")
+                }
+                OutlinedButton(onClick = onClose) {
+                    Text("Close")
+                }
             }
         }
     }
