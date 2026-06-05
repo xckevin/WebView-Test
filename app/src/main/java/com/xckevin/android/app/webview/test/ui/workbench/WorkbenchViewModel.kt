@@ -2,6 +2,7 @@ package com.xckevin.android.app.webview.test.ui.workbench
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xckevin.android.app.webview.test.data.CaseImportExport
 import com.xckevin.android.app.webview.test.data.HistoryRepository
 import com.xckevin.android.app.webview.test.data.TestCaseRepository
 import com.xckevin.android.app.webview.test.debug.DebugLogEntry
@@ -15,6 +16,7 @@ import com.xckevin.android.app.webview.test.web.WebPageEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -25,6 +27,8 @@ class WorkbenchViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkbenchState())
     val state: StateFlow<WorkbenchState> = _state.asStateFlow()
+    val cases = testCaseRepository.observeAll()
+    val history = historyRepository.observeRecent()
     private var nextNavigationId = 1L
 
     fun onUrlInputChanged(value: String) {
@@ -51,6 +55,7 @@ class WorkbenchViewModel(
                 requestedNavigationId = navigationId,
                 activeNavigationId = navigationId,
                 activeNavigationCompleted = false,
+                isFullscreen = it.config.startFullscreen,
                 urlError = null,
             )
         }
@@ -63,6 +68,30 @@ class WorkbenchViewModel(
 
     fun applyConfig(config: WebTestConfig) {
         _state.update { it.copy(config = config) }
+    }
+
+    fun selectPanel(panel: WorkbenchPanel) {
+        _state.update { it.copy(selectedPanel = panel) }
+    }
+
+    fun refresh() {
+        val currentState = state.value
+        val url = currentState.currentUrl ?: currentState.requestedUrl ?: return
+        val navigationId = nextNavigationId()
+        _state.update {
+            it.copy(
+                urlInput = url,
+                currentUrl = url,
+                currentTitle = "",
+                isLoading = true,
+                loadProgress = 0,
+                requestedUrl = url,
+                requestedNavigationId = navigationId,
+                activeNavigationId = navigationId,
+                activeNavigationCompleted = false,
+                urlError = null,
+            )
+        }
     }
 
     fun saveCurrentAsCase(name: String, note: String) {
@@ -89,6 +118,45 @@ class WorkbenchViewModel(
         }
     }
 
+    fun deleteCase(testCase: WebTestCase) {
+        viewModelScope.launch {
+            testCaseRepository.delete(testCase)
+        }
+    }
+
+    fun importCasesJson(raw: String) {
+        viewModelScope.launch {
+            runCatching {
+                val incoming = CaseImportExport.importCases(raw)
+                val existing = testCaseRepository.observeAll().first()
+                val conflictKeys = CaseImportExport.findConflicts(existing, incoming)
+                    .map { it.incoming.name.trim() to it.incoming.url.trim() }
+                    .toSet()
+                val casesToImport = incoming.filterNot { it.name.trim() to it.url.trim() in conflictKeys }
+                casesToImport.forEach { testCaseRepository.upsert(it) }
+                casesToImport.size to conflictKeys.size
+            }.onSuccess { (importedCount, skippedCount) ->
+                _state.update {
+                    it.copy(
+                        selectedPanel = WorkbenchPanel.CASES,
+                        debugState = it.debugState.withLog(
+                            "Imported $importedCount cases, skipped $skippedCount conflicts"
+                        ),
+                    )
+                }
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        selectedPanel = WorkbenchPanel.CASES,
+                        debugState = it.debugState.withLog(
+                            "Case import failed: ${error.message.orEmpty()}"
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     fun openCase(testCase: WebTestCase) {
         val navigationId = nextNavigationId()
         _state.update {
@@ -103,11 +171,22 @@ class WorkbenchViewModel(
                 requestedNavigationId = navigationId,
                 activeNavigationId = navigationId,
                 activeNavigationCompleted = false,
+                isFullscreen = testCase.config.startFullscreen,
                 urlError = null,
             )
         }
         viewModelScope.launch {
             testCaseRepository.upsert(testCase.copy(lastOpenedAt = clock()))
+        }
+    }
+
+    fun openHistory(item: HistoryItem) {
+        loadUrl(item.url)
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            historyRepository.clear()
         }
     }
 
