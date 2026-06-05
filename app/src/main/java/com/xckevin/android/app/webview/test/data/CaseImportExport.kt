@@ -6,13 +6,20 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 object CaseImportExport {
+    private const val SUPPORTED_VERSION = 1
+
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true; prettyPrint = true }
 
     fun exportCases(cases: List<WebTestCase>): String =
-        json.encodeToString(CaseExportFile(version = 1, cases = cases.map(CaseExportItem::from)))
+        json.encodeToString(CaseExportFile(version = SUPPORTED_VERSION, cases = cases.map(CaseExportItem::from)))
 
-    fun importCases(raw: String): List<WebTestCase> =
-        json.decodeFromString<CaseExportFile>(raw).cases.map { it.toDomain() }
+    fun importCases(raw: String): List<WebTestCase> {
+        val exportFile = json.decodeFromString<CaseExportFile>(raw)
+        if (exportFile.version != SUPPORTED_VERSION) {
+            throw UnsupportedCaseExportVersionException(exportFile.version)
+        }
+        return exportFile.cases.map { it.toDomain() }
+    }
 
     fun findConflicts(existing: List<WebTestCase>, incoming: List<WebTestCase>): List<CaseConflict> {
         val existingKeys = existing.map { it.name.trim() to it.url.trim() }.toSet()
@@ -20,6 +27,10 @@ object CaseImportExport {
             .map { CaseConflict(it) }
     }
 }
+
+class UnsupportedCaseExportVersionException(
+    val version: Int,
+) : IllegalArgumentException("Unsupported case export version: $version")
 
 @Serializable
 data class CaseExportFile(
