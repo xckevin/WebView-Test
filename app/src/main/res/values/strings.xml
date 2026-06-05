@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">WebViewTest</string>
+    <string name="screen_workbench">Workbench</string>
+    <string name="screen_scanner">Scanner</string>
+    <string name="screen_settings">Settings</string>
+    <string name="action_open_scanner">Open scanner</string>
+    <string name="action_open_settings">Open settings</string>
+    <string name="action_close">Close</string>
+    <string name="action_back">Back</string>
 </resources>
