@@ -34,6 +34,13 @@ class CaseImportExportTest {
         assertEquals(2, error.version)
     }
 
+    @Test fun rejectsUnsupportedVersionBeforeDecodingPayload() {
+        val error = assertThrows(UnsupportedCaseExportVersionException::class.java) {
+            CaseImportExport.importCases("""{"version":2,"payload":{"unexpected":true}}""")
+        }
+        assertEquals(2, error.version)
+    }
+
     @Test fun detectsConflictByNameAndUrl() {
         val existing = listOf(WebTestCase(1, " Home ", "https://example.com ", "", WebTestConfig.default(), 1, 1, null))
         val incoming = WebTestCase(0, "Home", " https://example.com", "", WebTestConfig.default(), 2, 2, null)

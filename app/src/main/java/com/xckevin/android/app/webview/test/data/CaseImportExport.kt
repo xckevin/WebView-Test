@@ -14,10 +14,11 @@ object CaseImportExport {
         json.encodeToString(CaseExportFile(version = SUPPORTED_VERSION, cases = cases.map(CaseExportItem::from)))
 
     fun importCases(raw: String): List<WebTestCase> {
-        val exportFile = json.decodeFromString<CaseExportFile>(raw)
-        if (exportFile.version != SUPPORTED_VERSION) {
-            throw UnsupportedCaseExportVersionException(exportFile.version)
+        val header = json.decodeFromString<CaseExportHeader>(raw)
+        if (header.version != SUPPORTED_VERSION) {
+            throw UnsupportedCaseExportVersionException(header.version)
         }
+        val exportFile = json.decodeFromString<CaseExportFile>(raw)
         return exportFile.cases.map { it.toDomain() }
     }
 
@@ -31,6 +32,11 @@ object CaseImportExport {
 class UnsupportedCaseExportVersionException(
     val version: Int,
 ) : IllegalArgumentException("Unsupported case export version: $version")
+
+@Serializable
+private data class CaseExportHeader(
+    val version: Int,
+)
 
 @Serializable
 data class CaseExportFile(
