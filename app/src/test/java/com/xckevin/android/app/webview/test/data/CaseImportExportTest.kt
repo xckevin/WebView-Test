@@ -18,8 +18,8 @@ class CaseImportExportTest {
     }
 
     @Test fun detectsConflictByNameAndUrl() {
-        val existing = listOf(WebTestCase(1, "Home", "https://example.com", "", WebTestConfig.default(), 1, 1, null))
-        val incoming = WebTestCase(0, "Home", "https://example.com", "", WebTestConfig.default(), 2, 2, null)
+        val existing = listOf(WebTestCase(1, " Home ", "https://example.com ", "", WebTestConfig.default(), 1, 1, null))
+        val incoming = WebTestCase(0, "Home", " https://example.com", "", WebTestConfig.default(), 2, 2, null)
         val conflicts = CaseImportExport.findConflicts(existing, listOf(incoming))
         assertEquals(1, conflicts.size)
         assertEquals("Home", conflicts.single().incoming.name)
