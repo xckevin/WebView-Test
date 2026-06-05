@@ -36,7 +36,11 @@ class TestWebViewClient(
         request: WebResourceRequest?,
         error: WebResourceError?,
     ) {
-        val navigationId = navigationTracker.onNavigationError(request?.url?.toString()) ?: 0L
+        val navigationId = if (request?.isForMainFrame == true) {
+            navigationTracker.onNavigationError(request.url?.toString()) ?: 0L
+        } else {
+            navigationTracker.activeNavigationId()
+        }
         emit(
             view,
             WebPageEvent.LoadError(
@@ -53,7 +57,11 @@ class TestWebViewClient(
         request: WebResourceRequest?,
         errorResponse: WebResourceResponse?,
     ) {
-        val navigationId = navigationTracker.onNavigationError(request?.url?.toString()) ?: 0L
+        val navigationId = if (request?.isForMainFrame == true) {
+            navigationTracker.navigationIdForHttpError(request.url?.toString()) ?: 0L
+        } else {
+            navigationTracker.activeNavigationId()
+        }
         emit(
             view,
             WebPageEvent.HttpError(

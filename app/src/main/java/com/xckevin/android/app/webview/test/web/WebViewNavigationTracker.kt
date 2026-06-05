@@ -1,26 +1,30 @@
 package com.xckevin.android.app.webview.test.web
 
 class WebViewNavigationTracker {
-    private var pendingExplicitNavigation: PendingExplicitNavigation? = null
+    private val pendingExplicitNavigations = mutableListOf<PendingExplicitNavigation>()
     private var activeNavigationId: Long = 0L
     private var activeNavigationUrl: String? = null
     private var activeNavigationCompleted: Boolean = false
     private var nextFallbackNavigationId: Long = 1L
     private val startedNavigationIdsByUrl = mutableMapOf<String, MutableList<Long>>()
 
+    @Synchronized
     fun markExplicitNavigation(navigationId: Long, url: String) {
-        pendingExplicitNavigation = PendingExplicitNavigation(
-            navigationId = navigationId,
-            url = url,
+        pendingExplicitNavigations.add(
+            PendingExplicitNavigation(
+                navigationId = navigationId,
+                url = url,
+            )
         )
         nextFallbackNavigationId = maxOf(nextFallbackNavigationId, navigationId + 1)
     }
 
+    @Synchronized
     fun onPageStarted(url: String): Long {
-        val pendingNavigation = pendingExplicitNavigation
-        pendingExplicitNavigation = null
+        val pendingNavigation = pendingExplicitNavigations.firstOrNull()
 
         val navigationId = if (pendingNavigation?.matches(url) == true) {
+            pendingExplicitNavigations.removeAt(0)
             pendingNavigation.navigationId
         } else {
             nextFallbackNavigationId++
@@ -35,10 +39,16 @@ class WebViewNavigationTracker {
         return navigationId
     }
 
+    @Synchronized
     fun onPageFinished(url: String): Long? = completeNavigation(url)
 
+    @Synchronized
     fun onNavigationError(url: String?): Long? = completeNavigation(url.orEmpty())
 
+    @Synchronized
+    fun navigationIdForHttpError(url: String?): Long? = findNavigation(url.orEmpty())
+
+    @Synchronized
     fun activeNavigationId(): Long = activeNavigationId
 
     private fun completeNavigation(url: String): Long? {
@@ -67,6 +77,22 @@ class WebViewNavigationTracker {
         }
 
         return null
+    }
+
+    private fun findNavigation(url: String): Long? {
+        val normalizedUrl = NavigationUrl.normalize(url)
+        val startedNavigationId = startedNavigationIdsByUrl[normalizedUrl]?.firstOrNull()
+        if (startedNavigationId != null) {
+            return startedNavigationId
+        }
+
+        return activeNavigationId.takeIf {
+            it > 0L &&
+                !activeNavigationCompleted &&
+                activeNavigationUrl?.let { activeUrl ->
+                    NavigationUrl.matches(activeUrl, url)
+                } == true
+        }
     }
 
     private data class PendingExplicitNavigation(

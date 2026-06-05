@@ -36,6 +36,16 @@ class WebViewController {
     }
 }
 
+internal data class LoadedNavigationKey(
+    val url: String,
+    val navigationId: Long,
+)
+
+internal fun loadedNavigationKey(url: String?, navigationId: Long): LoadedNavigationKey? =
+    url?.takeUnless { it.isBlank() }?.let {
+        LoadedNavigationKey(url = it, navigationId = navigationId)
+    }
+
 @Composable
 fun rememberWebViewController(): WebViewController = remember { WebViewController() }
 
@@ -72,7 +82,7 @@ fun WebViewHost(
 ) {
     val currentOnEvent = rememberUpdatedState(onEvent)
     val navigationTracker = remember { WebViewNavigationTracker() }
-    var lastLoadedUrl by remember { mutableStateOf<String?>(null) }
+    var lastLoadedNavigation by remember { mutableStateOf<LoadedNavigationKey?>(null) }
     val eventSink: (WebPageEvent) -> Unit = remember {
         { event -> currentOnEvent.value(event) }
     }
@@ -108,18 +118,17 @@ fun WebViewHost(
             controller.attach(webView)
             WebViewSettingsApplier.apply(webView = webView, config = config)
 
-            if (url != lastLoadedUrl) {
-                lastLoadedUrl = url
-                if (!url.isNullOrBlank()) {
-                    if (config.cacheMode == WebCacheMode.CLEAR_BEFORE_LOAD) {
-                        webView.clearCache(true)
-                    }
-                    navigationTracker.markExplicitNavigation(
-                        navigationId = navigationId,
-                        url = url,
-                    )
-                    webView.loadUrl(url)
+            val requestedNavigation = loadedNavigationKey(url, navigationId)
+            if (requestedNavigation != null && requestedNavigation != lastLoadedNavigation) {
+                lastLoadedNavigation = requestedNavigation
+                if (config.cacheMode == WebCacheMode.CLEAR_BEFORE_LOAD) {
+                    webView.clearCache(true)
                 }
+                navigationTracker.markExplicitNavigation(
+                    navigationId = requestedNavigation.navigationId,
+                    url = requestedNavigation.url,
+                )
+                webView.loadUrl(requestedNavigation.url)
             }
         },
         onRelease = { webView ->
