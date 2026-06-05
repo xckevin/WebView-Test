@@ -1,5 +1,6 @@
 package com.xckevin.android.app.webview.test.web
 
+import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,30 @@ class WebViewController {
 
         webView.goBack()
         return true
+    }
+
+    fun evaluateJavaScript(script: String, callback: (String) -> Unit) {
+        val webView = webView
+        if (webView == null) {
+            callback("No WebView attached")
+            return
+        }
+
+        webView.evaluateJavascript(script, callback)
+    }
+
+    fun readCookies(): String {
+        val url = webView?.url ?: return ""
+        return CookieManager.getInstance().getCookie(url).orEmpty()
+    }
+
+    fun clearCookies(callback: (Boolean) -> Unit) {
+        CookieManager.getInstance().removeAllCookies(callback)
+        CookieManager.getInstance().flush()
+    }
+
+    fun clearCache(includeDiskFiles: Boolean = true) {
+        webView?.clearCache(includeDiskFiles)
     }
 
     internal fun attach(webView: WebView) {

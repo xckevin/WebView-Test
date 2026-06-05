@@ -2,7 +2,7 @@ package com.xckevin.android.app.webview.test.ui.workbench
 
 import com.xckevin.android.app.webview.test.FakeHistoryRepository
 import com.xckevin.android.app.webview.test.FakeTestCaseRepository
-import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.debug.PageStatus
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
 import com.xckevin.android.app.webview.test.model.WebTestCase
@@ -413,6 +413,38 @@ class WorkbenchViewModelTest {
         assertEquals(emptyList<HistoryItem>(), historyRepository.insertedItems)
     }
 
+    @Test fun staleMainFrameLoadErrorDoesNotReplaceDebugPageSnapshot() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://stale.example.com")
+        val staleNavigationId = viewModel.state.value.activeNavigationId
+        viewModel.loadUrl("https://active.example.com")
+        val activeNavigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://active.example.com",
+                navigationId = activeNavigationId,
+            )
+        )
+        val pageBeforeError = viewModel.state.value.debugState.page
+
+        viewModel.onWebPageEvent(
+            WebPageEvent.LoadError(
+                url = "https://stale.example.com",
+                code = -2,
+                description = "Host lookup failed",
+                navigationId = staleNavigationId,
+                isMainFrame = true,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertTrue(state.isLoading)
+        assertEquals(pageBeforeError, state.debugState.page)
+        assertEquals("https://stale.example.com", state.debugState.errors.single().url)
+        assertTrue(state.debugState.errors.single().isMainFrame)
+    }
+
     @Test fun sslErrorCompletesLoadingWithoutHistoryInsert() = runTest {
         val viewModel = viewModel()
 
@@ -434,6 +466,35 @@ class WorkbenchViewModelTest {
         assertEquals(emptyList<HistoryItem>(), historyRepository.insertedItems)
     }
 
+    @Test fun staleSslErrorDoesNotReplaceDebugPageSnapshot() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://stale.example.com")
+        val staleNavigationId = viewModel.state.value.activeNavigationId
+        viewModel.loadUrl("https://active.example.com")
+        val activeNavigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://active.example.com",
+                navigationId = activeNavigationId,
+            )
+        )
+        val pageBeforeError = viewModel.state.value.debugState.page
+
+        viewModel.onWebPageEvent(
+            WebPageEvent.SslError(
+                url = "https://stale.example.com",
+                primaryError = 3,
+                navigationId = staleNavigationId,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertTrue(state.isLoading)
+        assertEquals(pageBeforeError, state.debugState.page)
+        assertEquals("https://stale.example.com", state.debugState.errors.single().url)
+    }
+
     @Test fun fakeHistoryObserveRecentEmitsAfterInsertAndClear() = runTest {
         val repository = FakeHistoryRepository()
         val recentHistory = repository.observeRecent(limit = 1)
@@ -452,7 +513,7 @@ class WorkbenchViewModelTest {
         assertEquals(emptyList<HistoryItem>(), recentHistory.first())
     }
 
-    @Test fun clearDebugLogsEmptiesDebugState() = runTest {
+    @Test fun clearDebugLogsKeepsPageSnapshotAndClearsLists() = runTest {
         val viewModel = viewModel()
 
         viewModel.loadUrl("https://example.com")
@@ -464,11 +525,42 @@ class WorkbenchViewModelTest {
             )
         )
         viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 50, navigationId = navigationId))
-        assertFalse(viewModel.state.value.debugState == DebugState())
+        val pageBeforeClear = viewModel.state.value.debugState.page
+        assertEquals(PageStatus.Loading, pageBeforeClear.status)
+        assertEquals(50, pageBeforeClear.progress)
 
         viewModel.clearDebugLogs()
 
-        assertEquals(DebugState(), viewModel.state.value.debugState)
+        val debugState = viewModel.state.value.debugState
+        assertEquals(pageBeforeClear, debugState.page)
+        assertTrue(debugState.consoleLogs.isEmpty())
+        assertTrue(debugState.errors.isEmpty())
+        assertTrue(debugState.requests.isEmpty())
+        assertTrue(debugState.downloads.isEmpty())
+        assertTrue(debugState.jsResults.isEmpty())
+    }
+
+    @Test fun recordJavaScriptResultAddsDebugResult() = runTest {
+        val viewModel = viewModel(clock = { 5000L })
+
+        viewModel.recordJavaScriptResult(script = "return 1", result = "1")
+
+        val result = viewModel.state.value.debugState.jsResults.single()
+        assertEquals("return 1", result.script)
+        assertEquals("1", result.result)
+        assertFalse(result.isError)
+        assertEquals(5000L, result.timestamp)
+    }
+
+    @Test fun addDebugMessageAddsInfoConsoleEntry() = runTest {
+        val viewModel = viewModel(clock = { 6000L })
+
+        viewModel.addDebugMessage("Cookies cleared")
+
+        val log = viewModel.state.value.debugState.consoleLogs.single()
+        assertEquals("INFO", log.level)
+        assertEquals("Cookies cleared", log.message)
+        assertEquals(6000L, log.timestamp)
     }
 
     @Test fun toggleFullscreenFlipsState() = runTest {

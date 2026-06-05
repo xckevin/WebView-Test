@@ -13,13 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -31,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.toClipEntry
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -40,16 +36,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xckevin.android.app.webview.test.AppContainer
 import com.xckevin.android.app.webview.test.data.CaseImportExport
-import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 import com.xckevin.android.app.webview.test.model.WebTestCase
 import com.xckevin.android.app.webview.test.ui.common.AppScaffold
 import com.xckevin.android.app.webview.test.web.WebPageEvent
+import com.xckevin.android.app.webview.test.web.WebViewController
 import com.xckevin.android.app.webview.test.web.WebViewHost
 import com.xckevin.android.app.webview.test.web.rememberWebViewController
-import java.text.DateFormat
-import java.util.Date
 import kotlinx.coroutines.launch
 
 @Composable
@@ -75,6 +69,26 @@ fun WorkbenchScreen(
     val history by viewModel.history.collectAsStateWithLifecycle(emptyList())
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
+    val webViewController = rememberWebViewController()
+    val evaluateJavaScript: (String, (String) -> Unit) -> Unit = { script, callback ->
+        webViewController.evaluateJavaScript(script) { result ->
+            viewModel.recordJavaScriptResult(script = script, result = result)
+            callback(result)
+        }
+    }
+    val readCookies: () -> Unit = {
+        val cookies = webViewController.readCookies()
+        viewModel.recordJavaScriptResult(script = "document.cookie", result = cookies)
+    }
+    val clearCookies: () -> Unit = {
+        webViewController.clearCookies { removed ->
+            viewModel.addDebugMessage("Cookies cleared: $removed")
+        }
+    }
+    val clearWebViewCache: () -> Unit = {
+        webViewController.clearCache()
+        viewModel.addDebugMessage("WebView cache cleared")
+    }
 
     val importCasesFromClipboard: () -> Unit = {
         coroutineScope.launch {
@@ -121,6 +135,7 @@ fun WorkbenchScreen(
                 onOpenSettings = onOpenSettings,
                 onToggleFullscreen = viewModel::toggleFullscreen,
                 onWebPageEvent = viewModel::onWebPageEvent,
+                controller = webViewController,
                 modifier = Modifier
                     .fillMaxSize()
                     .then(browserPadding),
@@ -149,6 +164,10 @@ fun WorkbenchScreen(
                             onOpenHistoryItem = viewModel::openHistory,
                             onClearHistory = viewModel::clearHistory,
                             onClearDebugLogs = viewModel::clearDebugLogs,
+                            onEvaluateJavaScript = evaluateJavaScript,
+                            onReadCookies = readCookies,
+                            onClearCookies = clearCookies,
+                            onClearWebViewCache = clearWebViewCache,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -174,6 +193,10 @@ fun WorkbenchScreen(
                             onOpenHistoryItem = viewModel::openHistory,
                             onClearHistory = viewModel::clearHistory,
                             onClearDebugLogs = viewModel::clearDebugLogs,
+                            onEvaluateJavaScript = evaluateJavaScript,
+                            onReadCookies = readCookies,
+                            onClearCookies = clearCookies,
+                            onClearWebViewCache = clearWebViewCache,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -203,10 +226,9 @@ private fun BrowserColumn(
     onOpenSettings: () -> Unit,
     onToggleFullscreen: () -> Unit,
     onWebPageEvent: (WebPageEvent) -> Unit,
+    controller: WebViewController,
     modifier: Modifier = Modifier,
 ) {
-    val webViewController = rememberWebViewController()
-
     Column(modifier = modifier.fillMaxSize()) {
         if (showUrlBar) {
             UrlBar(
@@ -229,7 +251,7 @@ private fun BrowserColumn(
             isFullscreen = state.isFullscreen,
             requestedNavigationId = state.requestedNavigationId,
             onEvent = onWebPageEvent,
-            controller = webViewController,
+            controller = controller,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -252,6 +274,10 @@ private fun WorkbenchPanelSurface(
     onOpenHistoryItem: (HistoryItem) -> Unit,
     onClearHistory: () -> Unit,
     onClearDebugLogs: () -> Unit,
+    onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
+    onReadCookies: () -> Unit,
+    onClearCookies: () -> Unit,
+    onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -273,6 +299,10 @@ private fun WorkbenchPanelSurface(
             onOpenHistoryItem = onOpenHistoryItem,
             onClearHistory = onClearHistory,
             onClearDebugLogs = onClearDebugLogs,
+            onEvaluateJavaScript = onEvaluateJavaScript,
+            onReadCookies = onReadCookies,
+            onClearCookies = onClearCookies,
+            onClearWebViewCache = onClearWebViewCache,
             modifier = Modifier.weight(1f),
         )
     }
@@ -333,6 +363,10 @@ private fun PanelContent(
     onOpenHistoryItem: (HistoryItem) -> Unit,
     onClearHistory: () -> Unit,
     onClearDebugLogs: () -> Unit,
+    onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
+    onReadCookies: () -> Unit,
+    onClearCookies: () -> Unit,
+    onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (selectedPanel) {
@@ -363,68 +397,12 @@ private fun PanelContent(
         WorkbenchPanel.DEBUG -> DebugPanel(
             debugState = state.debugState,
             onClearDebugLogs = onClearDebugLogs,
+            onEvaluateJavaScript = onEvaluateJavaScript,
+            onReadCookies = onReadCookies,
+            onClearCookies = onClearCookies,
+            onClearWebViewCache = onClearWebViewCache,
             modifier = modifier,
         )
-    }
-}
-
-@Composable
-private fun DebugPanel(
-    debugState: DebugState,
-    onClearDebugLogs: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Debug logs",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                OutlinedButton(
-                    enabled = debugState.logs.isNotEmpty(),
-                    onClick = onClearDebugLogs,
-                ) {
-                    Text("Clear")
-                }
-            }
-        }
-
-        if (debugState.logs.isEmpty()) {
-            item {
-                Text(
-                    text = "No debug logs",
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        } else {
-            items(debugState.logs.asReversed()) { log ->
-                Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = DateFormat.getDateTimeInstance().format(Date(log.timestamp)),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Text(
-                        text = log.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
     }
 }
 

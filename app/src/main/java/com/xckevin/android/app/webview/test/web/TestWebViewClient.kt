@@ -70,6 +70,7 @@ class TestWebViewClient(
                 statusCode = errorResponse?.statusCode ?: 0,
                 reason = errorResponse?.reasonPhrase.orEmpty(),
                 navigationId = navigationId,
+                isMainFrame = request?.isForMainFrame == true,
             )
         )
     }

@@ -5,7 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.xckevin.android.app.webview.test.data.CaseImportExport
 import com.xckevin.android.app.webview.test.data.HistoryRepository
 import com.xckevin.android.app.webview.test.data.TestCaseRepository
-import com.xckevin.android.app.webview.test.debug.DebugLogEntry
+import com.xckevin.android.app.webview.test.debug.DebugAction
+import com.xckevin.android.app.webview.test.debug.DebugReducer
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
@@ -139,8 +140,10 @@ class WorkbenchViewModel(
                 _state.update {
                     it.copy(
                         selectedPanel = WorkbenchPanel.CASES,
-                        debugState = it.debugState.withLog(
-                            "Imported $importedCount cases, skipped $skippedCount conflicts"
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.DebugMessage(
+                                message = "Imported $importedCount cases, skipped $skippedCount conflicts",
+                            )
                         ),
                     )
                 }
@@ -148,8 +151,10 @@ class WorkbenchViewModel(
                 _state.update {
                     it.copy(
                         selectedPanel = WorkbenchPanel.CASES,
-                        debugState = it.debugState.withLog(
-                            "Case import failed: ${error.message.orEmpty()}"
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.DebugMessage(
+                                message = "Case import failed: ${error.message.orEmpty()}",
+                            )
                         ),
                     )
                 }
@@ -213,7 +218,12 @@ class WorkbenchViewModel(
                         loadProgress = 0,
                         activeNavigationId = event.navigationId,
                         activeNavigationCompleted = false,
-                        debugState = it.debugState.withLog("Page started: ${event.url}"),
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.PageStarted(
+                                url = event.url,
+                                navigationId = event.navigationId,
+                            )
+                        ),
                     )
                 }
             }
@@ -229,7 +239,13 @@ class WorkbenchViewModel(
                         isLoading = false,
                         loadProgress = 100,
                         activeNavigationCompleted = true,
-                        debugState = it.debugState.withLog("Page finished: ${event.url}"),
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.PageFinished(
+                                url = event.url,
+                                title = title,
+                                navigationId = event.navigationId,
+                            )
+                        ),
                     )
                 }
                 viewModelScope.launch {
@@ -250,21 +266,47 @@ class WorkbenchViewModel(
                 _state.update {
                     it.copy(
                         loadProgress = event.progress.coerceIn(0, 100),
-                        debugState = it.debugState.withLog("Progress changed: ${event.progress}"),
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.ProgressChanged(
+                                navigationId = event.navigationId,
+                                progress = event.progress,
+                            )
+                        ),
                     )
                 }
             }
 
             is WebPageEvent.Console -> {
                 _state.update {
-                    it.copy(debugState = it.debugState.withLog("Console ${event.level}: ${event.message}"))
+                    it.copy(
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.ConsoleEvent(
+                                level = event.level,
+                                message = event.message,
+                                sourceId = event.sourceId,
+                                lineNumber = event.lineNumber,
+                                navigationId = event.navigationId,
+                            )
+                        )
+                    )
                 }
             }
 
             is WebPageEvent.LoadError -> {
                 _state.update {
-                    val debugState = it.debugState.withLog("Load error ${event.code}: ${event.description}")
-                    if (event.isMainFrame && event.navigationId.isCurrentLoadingNavigation(it)) {
+                    val completesActiveLoad =
+                        event.isMainFrame && event.navigationId.isCurrentLoadingNavigation(it)
+                    val debugState = it.debugState.reduceDebug(
+                        DebugAction.LoadError(
+                            url = event.url,
+                            code = event.code,
+                            description = event.description,
+                            navigationId = event.navigationId,
+                            isMainFrame = event.isMainFrame,
+                            updatesPage = completesActiveLoad,
+                        )
+                    )
+                    if (completesActiveLoad) {
                         it.copy(
                             isLoading = false,
                             loadProgress = 100,
@@ -279,14 +321,32 @@ class WorkbenchViewModel(
 
             is WebPageEvent.HttpError -> {
                 _state.update {
-                    it.copy(debugState = it.debugState.withLog("HTTP error ${event.statusCode}: ${event.reason}"))
+                    it.copy(
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.HttpError(
+                                url = event.url,
+                                statusCode = event.statusCode,
+                                reason = event.reason,
+                                navigationId = event.navigationId,
+                                isMainFrame = event.isMainFrame,
+                            )
+                        )
+                    )
                 }
             }
 
             is WebPageEvent.SslError -> {
                 _state.update {
-                    val debugState = it.debugState.withLog("SSL error: ${event.primaryError}")
-                    if (event.navigationId.isCurrentLoadingNavigation(it)) {
+                    val completesActiveLoad = event.navigationId.isCurrentLoadingNavigation(it)
+                    val debugState = it.debugState.reduceDebug(
+                        DebugAction.SslError(
+                            url = event.url,
+                            primaryError = event.primaryError,
+                            navigationId = event.navigationId,
+                            updatesPage = completesActiveLoad,
+                        )
+                    )
+                    if (completesActiveLoad) {
                         it.copy(
                             isLoading = false,
                             loadProgress = 100,
@@ -299,26 +359,88 @@ class WorkbenchViewModel(
                 }
             }
 
-            is WebPageEvent.ResourceRequest -> Unit
+            is WebPageEvent.ResourceRequest -> {
+                _state.update {
+                    it.copy(
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.ResourceRequest(
+                                url = event.url,
+                                isMainFrame = event.isMainFrame,
+                                navigationId = event.navigationId,
+                            )
+                        )
+                    )
+                }
+            }
 
             is WebPageEvent.DownloadRequested -> {
                 _state.update {
-                    it.copy(debugState = it.debugState.withLog("Download requested: ${event.url}"))
+                    it.copy(
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.DownloadRequested(
+                                url = event.url,
+                                userAgent = event.userAgent,
+                                contentDisposition = event.contentDisposition,
+                                mimeType = event.mimeType,
+                                contentLength = event.contentLength,
+                                navigationId = event.navigationId,
+                            )
+                        )
+                    )
                 }
             }
         }
     }
 
     fun clearDebugLogs() {
-        _state.update { it.copy(debugState = DebugState()) }
+        _state.update { it.copy(debugState = it.debugState.reduceDebug(DebugAction.ClearLogs(timestamp = clock()))) }
+    }
+
+    fun addDebugMessage(message: String) {
+        _state.update {
+            it.copy(
+                debugState = it.debugState.reduceDebug(
+                    DebugAction.DebugMessage(message = message)
+                )
+            )
+        }
+    }
+
+    fun recordJavaScriptResult(script: String, result: String, isError: Boolean = false) {
+        _state.update {
+            it.copy(
+                debugState = it.debugState.reduceDebug(
+                    DebugAction.JavaScriptResult(
+                        script = script,
+                        result = result,
+                        isError = isError,
+                    )
+                )
+            )
+        }
     }
 
     fun toggleFullscreen() {
         _state.update { it.copy(isFullscreen = !it.isFullscreen) }
     }
 
-    private fun DebugState.withLog(message: String): DebugState =
-        copy(logs = logs + DebugLogEntry(message = message, timestamp = clock()))
+    private fun DebugState.reduceDebug(action: DebugAction): DebugState {
+        val timestampedAction = when (action) {
+            is DebugAction.ClearLogs -> action
+            is DebugAction.DebugMessage -> action.copy(timestamp = clock())
+            is DebugAction.ConsoleEvent -> action.copy(timestamp = clock())
+            is DebugAction.PageStarted -> action.copy(timestamp = clock())
+            is DebugAction.PageFinished -> action.copy(timestamp = clock())
+            is DebugAction.ProgressChanged -> action.copy(timestamp = clock())
+            is DebugAction.LoadError -> action.copy(timestamp = clock())
+            is DebugAction.HttpError -> action.copy(timestamp = clock())
+            is DebugAction.SslError -> action.copy(timestamp = clock())
+            is DebugAction.ResourceRequest -> action.copy(timestamp = clock())
+            is DebugAction.DownloadRequested -> action.copy(timestamp = clock())
+            is DebugAction.JavaScriptResult -> action.copy(timestamp = clock())
+        }
+        return DebugReducer.reduce(this, timestampedAction)
+    }
 
     private fun nextNavigationId(): Long = nextNavigationId++
 

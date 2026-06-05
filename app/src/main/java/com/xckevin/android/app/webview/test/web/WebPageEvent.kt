@@ -23,6 +23,7 @@ sealed interface WebPageEvent {
         val statusCode: Int,
         val reason: String,
         val navigationId: Long = 0L,
+        val isMainFrame: Boolean = true,
     ) : WebPageEvent
     data class SslError(
         val url: String?,
