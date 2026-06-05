@@ -6,7 +6,7 @@ class WebViewNavigationTracker {
     private var activeNavigationUrl: String? = null
     private var activeNavigationCompleted: Boolean = false
     private var nextFallbackNavigationId: Long = 1L
-    private val startedNavigationIdsByUrl = mutableMapOf<String, Long>()
+    private val startedNavigationIdsByUrl = mutableMapOf<String, MutableList<Long>>()
 
     fun markExplicitNavigation(navigationId: Long, url: String) {
         pendingExplicitNavigation = PendingExplicitNavigation(
@@ -29,7 +29,8 @@ class WebViewNavigationTracker {
         activeNavigationId = navigationId
         activeNavigationUrl = url
         activeNavigationCompleted = false
-        startedNavigationIdsByUrl[NavigationUrl.normalize(url)] = navigationId
+        startedNavigationIdsByUrl.getOrPut(NavigationUrl.normalize(url)) { mutableListOf() }
+            .add(navigationId)
         nextFallbackNavigationId = maxOf(nextFallbackNavigationId, navigationId + 1)
         return navigationId
     }
@@ -42,8 +43,12 @@ class WebViewNavigationTracker {
 
     private fun completeNavigation(url: String): Long? {
         val normalizedUrl = NavigationUrl.normalize(url)
-        val startedNavigationId = startedNavigationIdsByUrl.remove(normalizedUrl)
+        val startedNavigationIds = startedNavigationIdsByUrl[normalizedUrl]
+        val startedNavigationId = startedNavigationIds?.removeFirstOrNull()
         if (startedNavigationId != null) {
+            if (startedNavigationIds.isEmpty()) {
+                startedNavigationIdsByUrl.remove(normalizedUrl)
+            }
             if (startedNavigationId == activeNavigationId) {
                 activeNavigationCompleted = true
             }

@@ -86,6 +86,19 @@ class WebViewNavigationTrackerTest {
         assertEquals(2L, tracker.onPageFinished("https://example.com/b"))
     }
 
+    @Test fun repeatedSameUrlFinishesConsumeNavigationIdsInStartOrder() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+
+        assertEquals(1L, tracker.onPageFinished("https://example.com/a"))
+        assertEquals(2L, tracker.onPageFinished("https://example.com/a"))
+        assertNull(tracker.onPageFinished("https://example.com/a"))
+    }
+
     @Test fun webInitiatedNavigationAfterActiveCompletionAllocatesAbovePreviousId() {
         val tracker = WebViewNavigationTracker()
 
