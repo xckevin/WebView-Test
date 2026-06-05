@@ -1,0 +1,10 @@
+<!doctype html>
+<html>
+<head><meta name="viewport" content="width=device-width, initial-scale=1"><title>WebView Test Fixture</title></head>
+<body>
+  <h1 id="title">WebView Test Fixture</h1>
+  <button id="store" onclick="localStorage.setItem('case','fixture');sessionStorage.setItem('session','fixture');console.log('stored')">Store</button>
+  <a id="download" href="data:text/plain,fixture" download="fixture.txt">Download</a>
+  <script>console.log('fixture loaded')</script>
+</body>
+</html>
