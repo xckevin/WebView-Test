@@ -25,6 +25,7 @@ class WorkbenchViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkbenchState())
     val state: StateFlow<WorkbenchState> = _state.asStateFlow()
+    private var nextNavigationId = 1L
 
     fun onUrlInputChanged(value: String) {
         _state.update { it.copy(urlInput = value, urlError = null) }
@@ -38,6 +39,7 @@ class WorkbenchViewModel(
             return
         }
 
+        val navigationId = nextNavigationId()
         _state.update {
             it.copy(
                 urlInput = normalizedUrl,
@@ -45,6 +47,7 @@ class WorkbenchViewModel(
                 currentTitle = "",
                 isLoading = true,
                 loadProgress = 0,
+                activeNavigationId = navigationId,
                 urlError = null,
             )
         }
@@ -84,6 +87,7 @@ class WorkbenchViewModel(
     }
 
     fun openCase(testCase: WebTestCase) {
+        val navigationId = nextNavigationId()
         _state.update {
             it.copy(
                 urlInput = testCase.url,
@@ -92,6 +96,7 @@ class WorkbenchViewModel(
                 config = testCase.config,
                 isLoading = true,
                 loadProgress = 0,
+                activeNavigationId = navigationId,
                 urlError = null,
             )
         }
@@ -103,7 +108,7 @@ class WorkbenchViewModel(
     fun onWebPageEvent(event: WebPageEvent) {
         when (event) {
             is WebPageEvent.PageStarted -> {
-                if (!event.url.isActiveEventUrl(allowMissingActiveUrl = true)) return
+                if (!event.navigationId.isActiveNavigationId()) return
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
@@ -117,7 +122,7 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.PageFinished -> {
-                if (!event.url.isActiveEventUrl()) return
+                if (!event.navigationId.isActiveNavigationId()) return
                 _state.update {
                     it.copy(
                         currentUrl = event.url,
@@ -142,7 +147,7 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.ProgressChanged -> {
-                if (!state.value.isLoading) return
+                if (!event.navigationId.isActiveNavigationId()) return
                 _state.update {
                     it.copy(
                         loadProgress = event.progress.coerceIn(0, 100),
@@ -164,8 +169,7 @@ class WorkbenchViewModel(
     private fun DebugState.withLog(message: String): DebugState =
         copy(logs = logs + DebugLogEntry(message = message, timestamp = clock()))
 
-    private fun String.isActiveEventUrl(allowMissingActiveUrl: Boolean = false): Boolean {
-        val currentUrl = state.value.currentUrl
-        return (currentUrl == null && allowMissingActiveUrl) || this == currentUrl
-    }
+    private fun nextNavigationId(): Long = nextNavigationId++
+
+    private fun Long.isActiveNavigationId(): Boolean = this == state.value.activeNavigationId
 }

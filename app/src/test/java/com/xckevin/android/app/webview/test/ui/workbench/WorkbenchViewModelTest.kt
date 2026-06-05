@@ -53,6 +53,7 @@ class WorkbenchViewModelTest {
         assertEquals("https://example.com", state.urlInput)
         assertEquals("", state.currentTitle)
         assertTrue(state.isLoading)
+        assertEquals(1L, state.activeNavigationId)
         assertNull(state.urlError)
     }
 
@@ -128,16 +129,20 @@ class WorkbenchViewModelTest {
         assertEquals("https://saved.example.com/path", state.urlInput)
         assertEquals("", state.currentTitle)
         assertEquals(openedConfig, state.config)
+        assertEquals(2L, state.activeNavigationId)
         assertEquals(testCase.copy(lastOpenedAt = 2000L), testCaseRepository.upsertedCases.single())
     }
 
     @Test fun stalePageFinishedIsIgnoredAndDoesNotInsertHistory() = runTest {
         val viewModel = viewModel(clock = { 3000L })
 
+        viewModel.loadUrl("https://stale.example.com")
+        val staleNavigationId = viewModel.state.value.activeNavigationId
         viewModel.loadUrl("https://active.example.com")
         viewModel.onWebPageEvent(
             WebPageEvent.PageFinished(
                 url = "https://stale.example.com",
+                navigationId = staleNavigationId,
                 title = "Stale",
             )
         )
@@ -154,9 +159,11 @@ class WorkbenchViewModelTest {
         val viewModel = viewModel(clock = { 4000L })
 
         viewModel.loadUrl("active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
         viewModel.onWebPageEvent(
             WebPageEvent.PageFinished(
                 url = "https://active.example.com",
+                navigationId = navigationId,
                 title = "Active title",
             )
         )
@@ -179,14 +186,55 @@ class WorkbenchViewModelTest {
         )
     }
 
-    @Test fun progressChangedUpdatesOnlyActiveLoadingNavigation() = runTest {
-        val viewModel = viewModel()
-
-        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 40))
-        assertEquals(0, viewModel.state.value.loadProgress)
+    @Test fun currentPageFinishedWithDifferentUrlUpdatesStateAndHistory() = runTest {
+        val viewModel = viewModel(clock = { 5000L })
 
         viewModel.loadUrl("https://active.example.com")
-        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 250))
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "https://redirected.example.com/path",
+                navigationId = navigationId,
+                title = "Redirected title",
+            )
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertEquals("https://redirected.example.com/path", state.currentUrl)
+        assertEquals("https://redirected.example.com/path", state.urlInput)
+        assertEquals("Redirected title", state.currentTitle)
+        assertFalse(state.isLoading)
+        assertEquals(
+            HistoryItem(
+                id = 0L,
+                url = "https://redirected.example.com/path",
+                title = "Redirected title",
+                sourceType = SourceType.REMOTE_URL,
+                visitedAt = 5000L,
+            ),
+            historyRepository.insertedItems.single(),
+        )
+    }
+
+    @Test fun staleProgressWithOldNavigationIdIsIgnored() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://stale.example.com")
+        val staleNavigationId = viewModel.state.value.activeNavigationId
+        viewModel.loadUrl("https://active.example.com")
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 80, navigationId = staleNavigationId))
+
+        assertEquals(0, viewModel.state.value.loadProgress)
+    }
+
+    @Test fun currentProgressWithCurrentNavigationIdUpdatesProgress() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 250, navigationId = navigationId))
+
         assertEquals(100, viewModel.state.value.loadProgress)
     }
 
@@ -212,8 +260,14 @@ class WorkbenchViewModelTest {
         val viewModel = viewModel()
 
         viewModel.loadUrl("https://example.com")
-        viewModel.onWebPageEvent(WebPageEvent.PageStarted("https://example.com"))
-        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(50))
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://example.com",
+                navigationId = navigationId,
+            )
+        )
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 50, navigationId = navigationId))
         assertFalse(viewModel.state.value.debugState == DebugState())
 
         viewModel.clearDebugLogs()
