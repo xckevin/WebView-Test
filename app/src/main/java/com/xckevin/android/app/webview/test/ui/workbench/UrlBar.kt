@@ -35,6 +35,7 @@ fun UrlBar(
     onUrlInputChanged: (String) -> Unit,
     onLoad: () -> Unit,
     onScan: () -> Unit,
+    onOpenLocalHtml: () -> Unit = {},
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleFullscreen: () -> Unit,
@@ -106,6 +107,12 @@ fun UrlBar(
                 modifier = Modifier.semantics { contentDescription = "Scan" },
             ) {
                 Text("Scan")
+            }
+            OutlinedButton(
+                onClick = onOpenLocalHtml,
+                modifier = Modifier.semantics { contentDescription = "Open local HTML" },
+            ) {
+                Text("Open local HTML")
             }
             OutlinedButton(
                 onClick = onRefresh,

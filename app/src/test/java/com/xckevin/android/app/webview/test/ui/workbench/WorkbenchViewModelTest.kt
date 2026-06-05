@@ -152,6 +152,37 @@ class WorkbenchViewModelTest {
         assertEquals(testCase.copy(lastOpenedAt = 2000L), testCaseRepository.upsertedCases.single())
     }
 
+    @Test fun openLocalFileCaseKeepsLocalSourceType() = runTest {
+        val viewModel = viewModel(clock = { 2100L })
+        val testCase = WebTestCase(
+            id = 43L,
+            name = "Local fixture",
+            url = "content://provider/fixture.html",
+            note = "",
+            config = WebTestConfig.default(),
+            createdAt = 100L,
+            updatedAt = 100L,
+            lastOpenedAt = null,
+        )
+
+        viewModel.openCase(testCase)
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "content://provider/fixture.html",
+                navigationId = navigationId,
+                title = "Fixture",
+            )
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertEquals(SourceType.LOCAL_FILE, state.requestedSourceType)
+        assertEquals(SourceType.LOCAL_FILE, state.activeSourceType)
+        assertEquals(SourceType.LOCAL_FILE, historyRepository.insertedItems.single().sourceType)
+        assertEquals(testCase.copy(lastOpenedAt = 2100L), testCaseRepository.upsertedCases.single())
+    }
+
     @Test fun stalePageFinishedIsIgnoredAndDoesNotInsertHistory() = runTest {
         val viewModel = viewModel(clock = { 3000L })
 
@@ -563,6 +594,69 @@ class WorkbenchViewModelTest {
         assertEquals(6000L, log.timestamp)
     }
 
+    @Test fun localFileLoadTracksLocalSourceTypeAndInsertsLocalHistory() = runTest {
+        val viewModel = viewModel(clock = { 7000L })
+
+        viewModel.loadLocalFile("content://provider/page.html")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "content://provider/page.html",
+                navigationId = navigationId,
+                title = "Local page",
+            )
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertEquals("content://provider/page.html", state.currentUrl)
+        assertEquals(SourceType.LOCAL_FILE, state.requestedSourceType)
+        assertEquals(SourceType.LOCAL_FILE, state.activeSourceType)
+        assertEquals(
+            HistoryItem(
+                id = 0L,
+                url = "content://provider/page.html",
+                title = "Local page",
+                sourceType = SourceType.LOCAL_FILE,
+                visitedAt = 7000L,
+            ),
+            historyRepository.insertedItems.single(),
+        )
+    }
+
+    @Test fun refreshKeepsLocalFileSourceType() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadLocalFile("content://provider/page.html")
+        viewModel.refresh()
+
+        val state = viewModel.state.value
+        assertEquals("content://provider/page.html", state.requestedUrl)
+        assertEquals(SourceType.LOCAL_FILE, state.requestedSourceType)
+        assertEquals(SourceType.LOCAL_FILE, state.activeSourceType)
+        assertEquals(2L, state.activeNavigationId)
+    }
+
+    @Test fun openLocalHistoryBypassesRemoteUrlNormalization() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.openHistory(
+            HistoryItem(
+                id = 5L,
+                url = "content://provider/page.html",
+                title = "Local page",
+                sourceType = SourceType.LOCAL_FILE,
+                visitedAt = 123L,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertEquals("content://provider/page.html", state.currentUrl)
+        assertEquals("content://provider/page.html", state.requestedUrl)
+        assertEquals(SourceType.LOCAL_FILE, state.activeSourceType)
+        assertNull(state.urlError)
+    }
+
     @Test fun toggleFullscreenFlipsState() = runTest {
         val viewModel = viewModel()
 
@@ -571,6 +665,16 @@ class WorkbenchViewModelTest {
 
         viewModel.toggleFullscreen()
         assertFalse(viewModel.state.value.isFullscreen)
+    }
+
+    @Test fun setVideoFullscreenUpdatesState() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.setVideoFullscreen(true)
+        assertTrue(viewModel.state.value.isVideoFullscreen)
+
+        viewModel.setVideoFullscreen(false)
+        assertFalse(viewModel.state.value.isVideoFullscreen)
     }
 
     private fun viewModel(clock: () -> Long = { 1000L }) =

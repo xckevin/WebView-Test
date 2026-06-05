@@ -1,8 +1,13 @@
 package com.xckevin.android.app.webview.test.web
 
+import android.net.Uri
+import android.view.View
+import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,12 +16,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import com.xckevin.android.app.webview.test.model.WebCacheMode
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 
 class WebViewController {
     private var webView: WebView? = null
+    private var fileChooserHandler: FileChooserHandler? = null
+    private var downloadHandler: DownloadHandler? = null
+    private var fullscreenVideoHandler: FullscreenVideoHandler? = null
+    private var webPermissionHandler: WebPermissionHandler? = null
 
     fun canGoBack(): Boolean = webView?.canGoBack() == true
 
@@ -52,12 +62,51 @@ class WebViewController {
         webView?.clearCache(includeDiskFiles)
     }
 
+    fun downloadUrl(url: String): Boolean =
+        downloadHandler?.requestDownload(url = url) == true
+
+    fun cancelFileChooser() {
+        fileChooserHandler?.cancelPending()
+    }
+
+    fun cancelWebPermissionPrompts() {
+        webPermissionHandler?.cancelPendingPrompts()
+    }
+
+    fun hideCustomView(): Boolean {
+        val handler = fullscreenVideoHandler ?: return false
+        if (!handler.isFullscreenActive()) return false
+
+        handler.onHideCustomView()
+        return true
+    }
+
     internal fun attach(webView: WebView) {
         this.webView = webView
     }
 
+    internal fun attachFileChooserHandler(fileChooserHandler: FileChooserHandler) {
+        this.fileChooserHandler = fileChooserHandler
+    }
+
+    internal fun attachDownloadHandler(downloadHandler: DownloadHandler) {
+        this.downloadHandler = downloadHandler
+    }
+
+    internal fun attachFullscreenVideoHandler(fullscreenVideoHandler: FullscreenVideoHandler) {
+        this.fullscreenVideoHandler = fullscreenVideoHandler
+    }
+
+    internal fun attachWebPermissionHandler(webPermissionHandler: WebPermissionHandler) {
+        this.webPermissionHandler = webPermissionHandler
+    }
+
     internal fun detach() {
         webView = null
+        fileChooserHandler = null
+        downloadHandler = null
+        fullscreenVideoHandler = null
+        webPermissionHandler = null
     }
 }
 
@@ -81,6 +130,11 @@ fun WebViewHost(
     isFullscreen: Boolean,
     requestedNavigationId: Long,
     onEvent: (WebPageEvent) -> Unit,
+    onOpenDocument: (Array<String>, (Uri?) -> Unit) -> Unit = { _, onResult -> onResult(null) },
+    onRequestRuntimePermissions: (Array<String>, (Map<String, Boolean>) -> Unit) -> Unit = { _, onResult -> onResult(emptyMap()) },
+    onWebPermissionPrompt: (WebPermissionPrompt?) -> Unit = { it?.onDeny() },
+    onFullscreenVideoChanged: (Boolean) -> Unit = {},
+    onContextMenuTarget: (WebContextMenuTarget) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val controller = rememberWebViewController()
@@ -90,6 +144,11 @@ fun WebViewHost(
         isFullscreen = isFullscreen,
         requestedNavigationId = requestedNavigationId,
         onEvent = onEvent,
+        onOpenDocument = onOpenDocument,
+        onRequestRuntimePermissions = onRequestRuntimePermissions,
+        onWebPermissionPrompt = onWebPermissionPrompt,
+        onFullscreenVideoChanged = onFullscreenVideoChanged,
+        onContextMenuTarget = onContextMenuTarget,
         controller = controller,
         modifier = modifier,
     )
@@ -105,67 +164,162 @@ fun WebViewHost(
     controller: WebViewController,
     modifier: Modifier = Modifier,
 ) {
+    WebViewHost(
+        requestedUrl = requestedUrl,
+        config = config,
+        isFullscreen = isFullscreen,
+        requestedNavigationId = requestedNavigationId,
+        onEvent = onEvent,
+        onOpenDocument = { _, onResult -> onResult(null) },
+        onRequestRuntimePermissions = { _, onResult -> onResult(emptyMap()) },
+        onWebPermissionPrompt = { it?.onDeny() },
+        onFullscreenVideoChanged = {},
+        onContextMenuTarget = {},
+        controller = controller,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun WebViewHost(
+    requestedUrl: String?,
+    config: WebTestConfig,
+    isFullscreen: Boolean,
+    requestedNavigationId: Long,
+    onEvent: (WebPageEvent) -> Unit,
+    onOpenDocument: (Array<String>, (Uri?) -> Unit) -> Unit = { _, onResult -> onResult(null) },
+    onRequestRuntimePermissions: (Array<String>, (Map<String, Boolean>) -> Unit) -> Unit = { _, onResult -> onResult(emptyMap()) },
+    onWebPermissionPrompt: (WebPermissionPrompt?) -> Unit = { it?.onDeny() },
+    onFullscreenVideoChanged: (Boolean) -> Unit = {},
+    onContextMenuTarget: (WebContextMenuTarget) -> Unit = {},
+    controller: WebViewController,
+    modifier: Modifier = Modifier,
+) {
     val currentOnEvent = rememberUpdatedState(onEvent)
+    val currentConfig = rememberUpdatedState(config)
+    val currentOnOpenDocument = rememberUpdatedState(onOpenDocument)
+    val currentOnRequestRuntimePermissions = rememberUpdatedState(onRequestRuntimePermissions)
+    val currentOnWebPermissionPrompt = rememberUpdatedState(onWebPermissionPrompt)
+    val currentOnFullscreenVideoChanged = rememberUpdatedState(onFullscreenVideoChanged)
+    val currentOnContextMenuTarget = rememberUpdatedState(onContextMenuTarget)
     val navigationTracker = remember { WebViewNavigationTracker() }
     var lastLoadedNavigation by remember { mutableStateOf<LoadedNavigationKey?>(null) }
+    var fullscreenVideoView by remember { mutableStateOf<View?>(null) }
     val eventSink: (WebPageEvent) -> Unit = remember {
         { event -> currentOnEvent.value(event) }
     }
+    val messageSink: (String) -> Unit = remember {
+        { message ->
+            eventSink(
+                WebPageEvent.Console(
+                    level = "INFO",
+                    message = message,
+                    sourceId = "webview-host",
+                    lineNumber = 0,
+                    navigationId = navigationTracker.activeNavigationId(),
+                )
+            )
+        }
+    }
 
-    AndroidView(
-        modifier = if (isFullscreen) modifier.fillMaxSize() else modifier,
-        factory = { context ->
-            WebView(context).also { webView ->
-                controller.attach(webView)
-                webView.webViewClient = TestWebViewClient(
-                    navigationTracker = navigationTracker,
-                    onEvent = eventSink,
-                )
-                webView.webChromeClient = TestWebChromeClient(
-                    navigationTracker = navigationTracker,
-                    onEvent = eventSink,
-                )
-                webView.setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, contentLength ->
-                    eventSink(
-                        WebPageEvent.DownloadRequested(
-                            url = downloadUrl,
-                            userAgent = userAgent,
-                            contentDisposition = contentDisposition,
-                            mimeType = mimeType,
-                            contentLength = contentLength,
-                            navigationId = navigationTracker.activeNavigationId(),
-                        )
+    Box(modifier = if (isFullscreen) modifier.fillMaxSize() else modifier) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                WebView(context).also { webView ->
+                    val fileChooserHandler = FileChooserHandler(
+                        configProvider = { currentConfig.value },
+                        openDocument = { mimeTypes, onResult ->
+                            currentOnOpenDocument.value(mimeTypes, onResult)
+                        },
+                        onMessage = messageSink,
                     )
-                }
-            }
-        },
-        update = { webView ->
-            controller.attach(webView)
-            WebViewSettingsApplier.apply(webView = webView, config = config)
+                    val fullscreenVideoHandler = FullscreenVideoHandler { view ->
+                        fullscreenVideoView = view
+                        currentOnFullscreenVideoChanged.value(view != null)
+                    }
+                    val webPermissionHandler = WebPermissionHandler(
+                        configProvider = { currentConfig.value },
+                        requestRuntimePermissions = { permissions, onResult ->
+                            currentOnRequestRuntimePermissions.value(permissions, onResult)
+                        },
+                        showPrompt = { prompt -> currentOnWebPermissionPrompt.value(prompt) },
+                        onMessage = messageSink,
+                    )
+                    val downloadHandler = DownloadHandler(
+                        context = context.applicationContext,
+                        navigationTracker = navigationTracker,
+                        onEvent = eventSink,
+                        onMessage = messageSink,
+                    )
 
-            val requestedNavigation = loadedNavigationKey(requestedUrl, requestedNavigationId)
-            if (requestedNavigation != null && requestedNavigation != lastLoadedNavigation) {
-                lastLoadedNavigation = requestedNavigation
-                if (config.cacheMode == WebCacheMode.CLEAR_BEFORE_LOAD) {
-                    webView.clearCache(true)
+                    controller.attach(webView)
+                    controller.attachFileChooserHandler(fileChooserHandler)
+                    controller.attachDownloadHandler(downloadHandler)
+                    controller.attachFullscreenVideoHandler(fullscreenVideoHandler)
+                    controller.attachWebPermissionHandler(webPermissionHandler)
+
+                    webView.webViewClient = TestWebViewClient(
+                        navigationTracker = navigationTracker,
+                        onEvent = eventSink,
+                    )
+                    webView.webChromeClient = TestWebChromeClient(
+                        navigationTracker = navigationTracker,
+                        onEvent = eventSink,
+                        fileChooserHandler = fileChooserHandler,
+                        fullscreenVideoHandler = fullscreenVideoHandler,
+                        webPermissionHandler = webPermissionHandler,
+                    )
+                    webView.setDownloadListener(downloadHandler)
+                    WebContextMenu(webView = webView) { target ->
+                        currentOnContextMenuTarget.value(target)
+                    }.attach()
                 }
-                navigationTracker.markExplicitNavigation(
-                    navigationId = requestedNavigation.navigationId,
-                    url = requestedNavigation.url,
-                )
-                webView.loadUrl(requestedNavigation.url)
-            }
-        },
-        onRelease = { webView ->
-            webView.stopLoading()
-            webView.setDownloadListener(null)
-            webView.webChromeClient = null
-            webView.webViewClient = WebViewClient()
-            webView.clearHistory()
-            webView.clearFormData()
-            webView.removeAllViews()
-            controller.detach()
-            webView.destroy()
-        },
-    )
+            },
+            update = { webView ->
+                controller.attach(webView)
+                WebViewSettingsApplier.apply(webView = webView, config = config)
+
+                val requestedNavigation = loadedNavigationKey(requestedUrl, requestedNavigationId)
+                if (requestedNavigation != null && requestedNavigation != lastLoadedNavigation) {
+                    lastLoadedNavigation = requestedNavigation
+                    if (config.cacheMode == WebCacheMode.CLEAR_BEFORE_LOAD) {
+                        webView.clearCache(true)
+                    }
+                    navigationTracker.markExplicitNavigation(
+                        navigationId = requestedNavigation.navigationId,
+                        url = requestedNavigation.url,
+                    )
+                    webView.loadUrl(requestedNavigation.url)
+                }
+            },
+            onRelease = { webView ->
+                controller.cancelFileChooser()
+                controller.cancelWebPermissionPrompts()
+                controller.hideCustomView()
+                webView.stopLoading()
+                webView.setDownloadListener(null)
+                webView.webChromeClient = null
+                webView.webViewClient = WebViewClient()
+                webView.setOnLongClickListener(null)
+                webView.clearHistory()
+                webView.clearFormData()
+                webView.removeAllViews()
+                controller.detach()
+                webView.destroy()
+            },
+        )
+
+        fullscreenVideoView?.let { customView ->
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                factory = {
+                    (customView.parent as? ViewGroup)?.removeView(customView)
+                    customView
+                },
+            )
+        }
+    }
 }

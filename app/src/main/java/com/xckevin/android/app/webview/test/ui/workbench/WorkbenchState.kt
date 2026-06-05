@@ -1,6 +1,7 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
 import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.model.SourceType
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 
 data class WorkbenchState(
@@ -13,9 +14,12 @@ data class WorkbenchState(
     val loadProgress: Int = 0,
     val requestedUrl: String? = null,
     val requestedNavigationId: Long = 0,
+    val requestedSourceType: SourceType = SourceType.REMOTE_URL,
     val activeNavigationId: Long = 0,
+    val activeSourceType: SourceType = SourceType.REMOTE_URL,
     val activeNavigationCompleted: Boolean = false,
     val isFullscreen: Boolean = false,
+    val isVideoFullscreen: Boolean = false,
     val urlError: String? = null,
     val debugState: DebugState = DebugState(),
 )

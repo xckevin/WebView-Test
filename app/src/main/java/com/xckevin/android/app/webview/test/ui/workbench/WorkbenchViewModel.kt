@@ -54,9 +54,12 @@ class WorkbenchViewModel(
                 loadProgress = 0,
                 requestedUrl = normalizedUrl,
                 requestedNavigationId = navigationId,
+                requestedSourceType = SourceType.REMOTE_URL,
                 activeNavigationId = navigationId,
+                activeSourceType = SourceType.REMOTE_URL,
                 activeNavigationCompleted = false,
                 isFullscreen = it.config.startFullscreen,
+                isVideoFullscreen = false,
                 urlError = null,
             )
         }
@@ -65,6 +68,29 @@ class WorkbenchViewModel(
     fun loadUrl(rawUrl: String) {
         onUrlInputChanged(rawUrl)
         loadUrl()
+    }
+
+    fun loadLocalFile(uriString: String) {
+        val localUrl = uriString.takeIf { it.isNotBlank() } ?: return
+        val navigationId = nextNavigationId()
+        _state.update {
+            it.copy(
+                urlInput = localUrl,
+                currentUrl = localUrl,
+                currentTitle = "",
+                isLoading = true,
+                loadProgress = 0,
+                requestedUrl = localUrl,
+                requestedNavigationId = navigationId,
+                requestedSourceType = SourceType.LOCAL_FILE,
+                activeNavigationId = navigationId,
+                activeSourceType = SourceType.LOCAL_FILE,
+                activeNavigationCompleted = false,
+                isFullscreen = it.config.startFullscreen,
+                isVideoFullscreen = false,
+                urlError = null,
+            )
+        }
     }
 
     fun applyConfig(config: WebTestConfig) {
@@ -78,6 +104,7 @@ class WorkbenchViewModel(
     fun refresh() {
         val currentState = state.value
         val url = currentState.currentUrl ?: currentState.requestedUrl ?: return
+        val sourceType = currentState.activeSourceType
         val navigationId = nextNavigationId()
         _state.update {
             it.copy(
@@ -88,7 +115,9 @@ class WorkbenchViewModel(
                 loadProgress = 0,
                 requestedUrl = url,
                 requestedNavigationId = navigationId,
+                requestedSourceType = sourceType,
                 activeNavigationId = navigationId,
+                activeSourceType = sourceType,
                 activeNavigationCompleted = false,
                 urlError = null,
             )
@@ -164,6 +193,7 @@ class WorkbenchViewModel(
 
     fun openCase(testCase: WebTestCase) {
         val navigationId = nextNavigationId()
+        val sourceType = testCase.url.sourceType()
         _state.update {
             it.copy(
                 urlInput = testCase.url,
@@ -174,9 +204,12 @@ class WorkbenchViewModel(
                 loadProgress = 0,
                 requestedUrl = testCase.url,
                 requestedNavigationId = navigationId,
+                requestedSourceType = sourceType,
                 activeNavigationId = navigationId,
+                activeSourceType = sourceType,
                 activeNavigationCompleted = false,
                 isFullscreen = testCase.config.startFullscreen,
+                isVideoFullscreen = false,
                 urlError = null,
             )
         }
@@ -186,7 +219,10 @@ class WorkbenchViewModel(
     }
 
     fun openHistory(item: HistoryItem) {
-        loadUrl(item.url)
+        when (item.sourceType) {
+            SourceType.REMOTE_URL -> loadUrl(item.url)
+            SourceType.LOCAL_FILE -> loadLocalFile(item.url)
+        }
     }
 
     fun clearHistory() {
@@ -210,6 +246,11 @@ class WorkbenchViewModel(
 
                 nextNavigationId = maxOf(nextNavigationId, event.navigationId + 1)
                 _state.update {
+                    val sourceType = if (event.navigationId == it.requestedNavigationId) {
+                        it.requestedSourceType
+                    } else {
+                        event.url.sourceType()
+                    }
                     it.copy(
                         currentUrl = event.url,
                         urlInput = event.url,
@@ -217,6 +258,7 @@ class WorkbenchViewModel(
                         isLoading = true,
                         loadProgress = 0,
                         activeNavigationId = event.navigationId,
+                        activeSourceType = sourceType,
                         activeNavigationCompleted = false,
                         debugState = it.debugState.reduceDebug(
                             DebugAction.PageStarted(
@@ -254,7 +296,7 @@ class WorkbenchViewModel(
                             id = 0L,
                             url = event.url,
                             title = title,
-                            sourceType = SourceType.REMOTE_URL,
+                            sourceType = state.value.activeSourceType,
                             visitedAt = clock(),
                         )
                     )
@@ -424,6 +466,10 @@ class WorkbenchViewModel(
         _state.update { it.copy(isFullscreen = !it.isFullscreen) }
     }
 
+    fun setVideoFullscreen(active: Boolean) {
+        _state.update { it.copy(isVideoFullscreen = active) }
+    }
+
     private fun DebugState.reduceDebug(action: DebugAction): DebugState {
         val timestampedAction = when (action) {
             is DebugAction.ClearLogs -> action
@@ -443,6 +489,13 @@ class WorkbenchViewModel(
     }
 
     private fun nextNavigationId(): Long = nextNavigationId++
+
+    private fun String.sourceType(): SourceType =
+        if (startsWith("content://") || startsWith("file://")) {
+            SourceType.LOCAL_FILE
+        } else {
+            SourceType.REMOTE_URL
+        }
 
     private fun Long.isCurrentLoadingNavigation(currentState: WorkbenchState = state.value): Boolean {
         return this > 0L &&
