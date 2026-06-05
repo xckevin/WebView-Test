@@ -20,7 +20,7 @@ class TestWebViewClient(
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
-        val navigationId = navigationTracker.activeNavigationId()
+        val navigationId = navigationTracker.onPageFinished(url.orEmpty()) ?: return
         emit(
             view,
             WebPageEvent.PageFinished(
@@ -36,13 +36,14 @@ class TestWebViewClient(
         request: WebResourceRequest?,
         error: WebResourceError?,
     ) {
+        val navigationId = navigationTracker.onNavigationError(request?.url?.toString()) ?: 0L
         emit(
             view,
             WebPageEvent.LoadError(
                 url = request?.url?.toString(),
                 code = error?.errorCode ?: 0,
                 description = error?.description?.toString().orEmpty(),
-                navigationId = navigationTracker.activeNavigationId(),
+                navigationId = navigationId,
             )
         )
     }
@@ -52,25 +53,27 @@ class TestWebViewClient(
         request: WebResourceRequest?,
         errorResponse: WebResourceResponse?,
     ) {
+        val navigationId = navigationTracker.onNavigationError(request?.url?.toString()) ?: 0L
         emit(
             view,
             WebPageEvent.HttpError(
                 url = request?.url?.toString(),
                 statusCode = errorResponse?.statusCode ?: 0,
                 reason = errorResponse?.reasonPhrase.orEmpty(),
-                navigationId = navigationTracker.activeNavigationId(),
+                navigationId = navigationId,
             )
         )
     }
 
     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
         handler?.cancel()
+        val navigationId = navigationTracker.onNavigationError(error?.url) ?: 0L
         emit(
             view,
             WebPageEvent.SslError(
                 url = error?.url,
                 primaryError = error?.primaryError ?: 0,
-                navigationId = navigationTracker.activeNavigationId(),
+                navigationId = navigationId,
             )
         )
     }

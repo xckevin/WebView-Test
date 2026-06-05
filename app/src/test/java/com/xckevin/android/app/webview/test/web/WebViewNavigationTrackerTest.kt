@@ -1,6 +1,7 @@
 package com.xckevin.android.app.webview.test.web
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class WebViewNavigationTrackerTest {
@@ -48,5 +49,53 @@ class WebViewNavigationTrackerTest {
         tracker.markExplicitNavigation(navigationId = 12L, url = "https://example.com")
 
         assertEquals(12L, tracker.onPageStarted("https://example.com/"))
+    }
+
+    @Test fun lateFinishUsesNavigationIdFromOriginalStart() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/b")
+        tracker.onPageStarted("https://example.com/b")
+
+        assertEquals(1L, tracker.onPageFinished("https://example.com/a"))
+    }
+
+    @Test fun duplicateLateFinishDoesNotUseNewerActiveNavigationId() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/b")
+        tracker.onPageStarted("https://example.com/b")
+        tracker.onPageFinished("https://example.com/a")
+
+        assertNull(tracker.onPageFinished("https://example.com/a"))
+    }
+
+    @Test fun newerPageFinishUsesNewerNavigationIdAfterLateFinish() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/b")
+        tracker.onPageStarted("https://example.com/b")
+        tracker.onPageFinished("https://example.com/a")
+
+        assertEquals(2L, tracker.onPageFinished("https://example.com/b"))
+    }
+
+    @Test fun webInitiatedNavigationAfterActiveCompletionAllocatesAbovePreviousId() {
+        val tracker = WebViewNavigationTracker()
+
+        tracker.markExplicitNavigation(navigationId = 1L, url = "https://example.com/a")
+        tracker.onPageStarted("https://example.com/a")
+        tracker.markExplicitNavigation(navigationId = 2L, url = "https://example.com/b")
+        tracker.onPageStarted("https://example.com/b")
+        tracker.onPageFinished("https://example.com/b")
+
+        assertEquals(3L, tracker.onPageStarted("https://example.com/c"))
+        assertEquals(3L, tracker.activeNavigationId())
     }
 }
