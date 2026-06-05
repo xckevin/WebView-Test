@@ -53,8 +53,22 @@ class WorkbenchViewModelTest {
         assertEquals("https://example.com", state.urlInput)
         assertEquals("", state.currentTitle)
         assertTrue(state.isLoading)
+        assertEquals(1L, state.requestedNavigationId)
         assertEquals(1L, state.activeNavigationId)
         assertNull(state.urlError)
+    }
+
+    @Test fun explicitLoadChangesRequestedNavigationId() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://first.example.com")
+        val firstState = viewModel.state.value
+        viewModel.loadUrl("https://second.example.com")
+        val secondState = viewModel.state.value
+
+        assertEquals(1L, firstState.requestedNavigationId)
+        assertEquals(2L, secondState.requestedNavigationId)
+        assertEquals(2L, secondState.activeNavigationId)
     }
 
     @Test fun invalidUrlSetsEditableError() = runTest {
@@ -129,6 +143,7 @@ class WorkbenchViewModelTest {
         assertEquals("https://saved.example.com/path", state.urlInput)
         assertEquals("", state.currentTitle)
         assertEquals(openedConfig, state.config)
+        assertEquals(2L, state.requestedNavigationId)
         assertEquals(2L, state.activeNavigationId)
         assertEquals(testCase.copy(lastOpenedAt = 2000L), testCaseRepository.upsertedCases.single())
     }
@@ -204,8 +219,26 @@ class WorkbenchViewModelTest {
         assertEquals("", state.currentTitle)
         assertTrue(state.isLoading)
         assertEquals(0, state.loadProgress)
+        assertEquals(1L, state.requestedNavigationId)
         assertEquals(2L, state.activeNavigationId)
         assertFalse(state.activeNavigationCompleted)
+    }
+
+    @Test fun observedPageStartedDoesNotChangeRequestedNavigationId() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://initial.example.com")
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageStarted(
+                url = "https://clicked.example.com",
+                navigationId = 2L,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertEquals("https://clicked.example.com", state.currentUrl)
+        assertEquals(1L, state.requestedNavigationId)
+        assertEquals(2L, state.activeNavigationId)
     }
 
     @Test fun olderPageStartedIsIgnored() = runTest {
@@ -348,6 +381,50 @@ class WorkbenchViewModelTest {
         viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 250, navigationId = navigationId))
 
         assertEquals(100, viewModel.state.value.loadProgress)
+    }
+
+    @Test fun mainFrameLoadErrorCompletesLoadingWithoutHistoryInsert() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.LoadError(
+                url = "https://active.example.com",
+                code = -2,
+                description = "Host lookup failed",
+                navigationId = navigationId,
+                isMainFrame = true,
+            )
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertFalse(state.isLoading)
+        assertEquals(100, state.loadProgress)
+        assertTrue(state.activeNavigationCompleted)
+        assertEquals(emptyList<HistoryItem>(), historyRepository.insertedItems)
+    }
+
+    @Test fun sslErrorCompletesLoadingWithoutHistoryInsert() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.SslError(
+                url = "https://active.example.com",
+                primaryError = 3,
+                navigationId = navigationId,
+            )
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertFalse(state.isLoading)
+        assertEquals(100, state.loadProgress)
+        assertTrue(state.activeNavigationCompleted)
+        assertEquals(emptyList<HistoryItem>(), historyRepository.insertedItems)
     }
 
     @Test fun fakeHistoryObserveRecentEmitsAfterInsertAndClear() = runTest {

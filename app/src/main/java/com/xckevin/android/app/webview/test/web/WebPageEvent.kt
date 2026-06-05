@@ -16,6 +16,7 @@ sealed interface WebPageEvent {
         val code: Int,
         val description: String,
         val navigationId: Long = 0L,
+        val isMainFrame: Boolean = true,
     ) : WebPageEvent
     data class HttpError(
         val url: String?,

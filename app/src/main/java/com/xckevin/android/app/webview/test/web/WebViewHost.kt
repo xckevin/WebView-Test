@@ -54,7 +54,7 @@ fun WebViewHost(
     url: String?,
     config: WebTestConfig,
     isFullscreen: Boolean,
-    navigationId: Long,
+    requestedNavigationId: Long,
     onEvent: (WebPageEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -63,7 +63,7 @@ fun WebViewHost(
         url = url,
         config = config,
         isFullscreen = isFullscreen,
-        navigationId = navigationId,
+        requestedNavigationId = requestedNavigationId,
         onEvent = onEvent,
         controller = controller,
         modifier = modifier,
@@ -75,7 +75,7 @@ fun WebViewHost(
     url: String?,
     config: WebTestConfig,
     isFullscreen: Boolean,
-    navigationId: Long,
+    requestedNavigationId: Long,
     onEvent: (WebPageEvent) -> Unit,
     controller: WebViewController,
     modifier: Modifier = Modifier,
@@ -118,7 +118,7 @@ fun WebViewHost(
             controller.attach(webView)
             WebViewSettingsApplier.apply(webView = webView, config = config)
 
-            val requestedNavigation = loadedNavigationKey(url, navigationId)
+            val requestedNavigation = loadedNavigationKey(url, requestedNavigationId)
             if (requestedNavigation != null && requestedNavigation != lastLoadedNavigation) {
                 lastLoadedNavigation = requestedNavigation
                 if (config.cacheMode == WebCacheMode.CLEAR_BEFORE_LOAD) {

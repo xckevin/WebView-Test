@@ -7,6 +7,7 @@ class WebViewNavigationTracker {
     private var activeNavigationCompleted: Boolean = false
     private var nextFallbackNavigationId: Long = 1L
     private val startedNavigationIdsByUrl = mutableMapOf<String, MutableList<Long>>()
+    private val suppressedStartCountsByUrl = mutableMapOf<String, Int>()
 
     @Synchronized
     fun markExplicitNavigation(navigationId: Long, url: String) {
@@ -20,10 +21,13 @@ class WebViewNavigationTracker {
     }
 
     @Synchronized
-    fun onPageStarted(url: String): Long {
+    fun onPageStarted(url: String): Long? {
         val pendingNavigationIndex = pendingExplicitNavigations.indexOfFirst { it.matches(url) }
         val pendingNavigation = pendingNavigationIndex.takeIf { it >= 0 }?.let { index ->
             val navigation = pendingExplicitNavigations[index]
+            pendingExplicitNavigations.subList(0, index).forEach { skippedNavigation ->
+                suppressStart(skippedNavigation.url)
+            }
             pendingExplicitNavigations.subList(0, index + 1).clear()
             navigation
         }
@@ -31,6 +35,7 @@ class WebViewNavigationTracker {
         val navigationId = if (pendingNavigation != null) {
             pendingNavigation.navigationId
         } else {
+            if (consumeSuppressedStart(url)) return null
             nextFallbackNavigationId++
         }
 
@@ -47,7 +52,12 @@ class WebViewNavigationTracker {
     fun onPageFinished(url: String): Long? = completeNavigation(url)
 
     @Synchronized
-    fun onNavigationError(url: String?): Long? = completeNavigation(url.orEmpty())
+    fun onNavigationError(url: String?): Long? =
+        if (url.isNullOrBlank()) {
+            completeActiveNavigation()
+        } else {
+            completeNavigation(url)
+        }
 
     @Synchronized
     fun navigationIdForHttpError(url: String?): Long? = findNavigation(url.orEmpty())
@@ -81,6 +91,33 @@ class WebViewNavigationTracker {
         }
 
         return null
+    }
+
+    private fun completeActiveNavigation(): Long? {
+        val navigationId = activeNavigationId.takeIf { it > 0L && !activeNavigationCompleted }
+            ?: return null
+        startedNavigationIdsByUrl.entries.removeAll { entry ->
+            entry.value.remove(navigationId)
+            entry.value.isEmpty()
+        }
+        activeNavigationCompleted = true
+        return navigationId
+    }
+
+    private fun suppressStart(url: String) {
+        val normalizedUrl = NavigationUrl.normalize(url)
+        suppressedStartCountsByUrl[normalizedUrl] = (suppressedStartCountsByUrl[normalizedUrl] ?: 0) + 1
+    }
+
+    private fun consumeSuppressedStart(url: String): Boolean {
+        val normalizedUrl = NavigationUrl.normalize(url)
+        val count = suppressedStartCountsByUrl[normalizedUrl] ?: return false
+        if (count <= 1) {
+            suppressedStartCountsByUrl.remove(normalizedUrl)
+        } else {
+            suppressedStartCountsByUrl[normalizedUrl] = count - 1
+        }
+        return true
     }
 
     private fun findNavigation(url: String): Long? {

@@ -47,6 +47,7 @@ class WorkbenchViewModel(
                 currentTitle = "",
                 isLoading = true,
                 loadProgress = 0,
+                requestedNavigationId = navigationId,
                 activeNavigationId = navigationId,
                 activeNavigationCompleted = false,
                 urlError = null,
@@ -97,6 +98,7 @@ class WorkbenchViewModel(
                 config = testCase.config,
                 isLoading = true,
                 loadProgress = 0,
+                requestedNavigationId = navigationId,
                 activeNavigationId = navigationId,
                 activeNavigationCompleted = false,
                 urlError = null,
@@ -180,7 +182,17 @@ class WorkbenchViewModel(
 
             is WebPageEvent.LoadError -> {
                 _state.update {
-                    it.copy(debugState = it.debugState.withLog("Load error ${event.code}: ${event.description}"))
+                    val debugState = it.debugState.withLog("Load error ${event.code}: ${event.description}")
+                    if (event.isMainFrame && event.navigationId.isCurrentLoadingNavigation(it)) {
+                        it.copy(
+                            isLoading = false,
+                            loadProgress = 100,
+                            activeNavigationCompleted = true,
+                            debugState = debugState,
+                        )
+                    } else {
+                        it.copy(debugState = debugState)
+                    }
                 }
             }
 
@@ -192,7 +204,17 @@ class WorkbenchViewModel(
 
             is WebPageEvent.SslError -> {
                 _state.update {
-                    it.copy(debugState = it.debugState.withLog("SSL error: ${event.primaryError}"))
+                    val debugState = it.debugState.withLog("SSL error: ${event.primaryError}")
+                    if (event.navigationId.isCurrentLoadingNavigation(it)) {
+                        it.copy(
+                            isLoading = false,
+                            loadProgress = 100,
+                            activeNavigationCompleted = true,
+                            debugState = debugState,
+                        )
+                    } else {
+                        it.copy(debugState = debugState)
+                    }
                 }
             }
 
@@ -219,8 +241,7 @@ class WorkbenchViewModel(
 
     private fun nextNavigationId(): Long = nextNavigationId++
 
-    private fun Long.isCurrentLoadingNavigation(): Boolean {
-        val currentState = state.value
+    private fun Long.isCurrentLoadingNavigation(currentState: WorkbenchState = state.value): Boolean {
         return this > 0L &&
             this == currentState.activeNavigationId &&
             currentState.isLoading &&

@@ -15,7 +15,7 @@ class TestWebViewClient(
     private val onEvent: (WebPageEvent) -> Unit,
 ) : WebViewClient() {
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-        val navigationId = navigationTracker.onPageStarted(url.orEmpty())
+        val navigationId = navigationTracker.onPageStarted(url.orEmpty()) ?: return
         emit(view, WebPageEvent.PageStarted(navigationId = navigationId, url = url.orEmpty()))
     }
 
@@ -48,6 +48,7 @@ class TestWebViewClient(
                 code = error?.errorCode ?: 0,
                 description = error?.description?.toString().orEmpty(),
                 navigationId = navigationId,
+                isMainFrame = request?.isForMainFrame == true,
             )
         )
     }
