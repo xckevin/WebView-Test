@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
@@ -221,11 +222,19 @@ fun UrlBar(
             }
         }
 
-        if (isLoading) {
-            LinearProgressIndicator(
-                progress = { loadProgress.coerceIn(0, 100) / 100f },
-                modifier = Modifier.fillMaxWidth(),
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .padding(top = 2.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            if (isLoading) {
+                LinearProgressIndicator(
+                    progress = { loadProgress.coerceIn(0, 100) / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -234,6 +243,5 @@ fun UrlBar(
 private fun String.localizedUrlError(): String =
     when (this) {
         "Enter a valid http or https URL" -> stringResource(R.string.error_invalid_http_url)
-        "Load a valid URL before saving a case" -> stringResource(R.string.error_load_valid_url_before_saving)
         else -> this
     }
