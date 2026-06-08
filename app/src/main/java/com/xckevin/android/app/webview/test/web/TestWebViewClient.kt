@@ -17,6 +17,7 @@ class TestWebViewClient(
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         val navigationId = navigationTracker.onPageStarted(url.orEmpty()) ?: return
         emit(view, WebPageEvent.PageStarted(navigationId = navigationId, url = url.orEmpty()))
+        emitNavigationState(view = view, navigationId = navigationId, url = url)
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
@@ -28,6 +29,16 @@ class TestWebViewClient(
                 url = url.orEmpty(),
                 title = view?.title.orEmpty(),
             )
+        )
+        emitNavigationState(view = view, navigationId = navigationId, url = url)
+    }
+
+    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+        super.doUpdateVisitedHistory(view, url, isReload)
+        emitNavigationState(
+            view = view,
+            navigationId = navigationTracker.activeNavigationId(),
+            url = url,
         )
     }
 
@@ -112,5 +123,18 @@ class TestWebViewClient(
         } else {
             view?.post { onEvent(event) }
         }
+    }
+
+    private fun emitNavigationState(view: WebView?, navigationId: Long, url: String?) {
+        if (navigationId <= 0L) return
+        emit(
+            view,
+            WebPageEvent.NavigationStateChanged(
+                navigationId = navigationId,
+                url = url ?: view?.url,
+                canGoBack = view?.canGoBack() == true,
+                canGoForward = view?.canGoForward() == true,
+            )
+        )
     }
 }

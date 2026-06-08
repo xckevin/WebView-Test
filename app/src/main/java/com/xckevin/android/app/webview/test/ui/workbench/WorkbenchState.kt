@@ -18,6 +18,8 @@ data class WorkbenchState(
     val activeNavigationId: Long = 0,
     val activeSourceType: SourceType = SourceType.REMOTE_URL,
     val activeNavigationCompleted: Boolean = false,
+    val canGoBack: Boolean = false,
+    val canGoForward: Boolean = false,
     val isFullscreen: Boolean = false,
     val isVideoFullscreen: Boolean = false,
     val urlError: String? = null,

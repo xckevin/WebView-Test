@@ -171,7 +171,7 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.PageFinished -> {
-                if (!event.navigationId.isCurrentLoadingNavigation()) return
+                if (!event.navigationId.isCurrentPendingNavigation()) return
                 val title = event.title.orEmpty()
                 _state.update {
                     it.copy(
@@ -204,16 +204,33 @@ class WorkbenchViewModel(
             }
 
             is WebPageEvent.ProgressChanged -> {
-                if (!event.navigationId.isCurrentLoadingNavigation()) return
+                if (!event.navigationId.isCurrentPendingNavigation()) return
                 _state.update {
+                    val progress = event.progress.coerceIn(0, 100)
                     it.copy(
-                        loadProgress = event.progress.coerceIn(0, 100),
+                        isLoading = if (progress >= 100) false else it.isLoading,
+                        loadProgress = maxOf(it.loadProgress, progress),
                         debugState = it.debugState.reduceDebug(
                             DebugAction.ProgressChanged(
                                 navigationId = event.navigationId,
                                 progress = event.progress,
                             )
                         ),
+                    )
+                }
+            }
+
+            is WebPageEvent.NavigationStateChanged -> {
+                _state.update {
+                    if (event.navigationId <= 0L || event.navigationId != it.activeNavigationId) {
+                        return@update it
+                    }
+                    val url = event.url?.takeIf { url -> url.isNotBlank() }
+                    it.copy(
+                        currentUrl = url ?: it.currentUrl,
+                        urlInput = url ?: it.urlInput,
+                        canGoBack = event.canGoBack,
+                        canGoForward = event.canGoForward,
                     )
                 }
             }
@@ -237,7 +254,7 @@ class WorkbenchViewModel(
             is WebPageEvent.LoadError -> {
                 _state.update {
                     val completesActiveLoad =
-                        event.isMainFrame && event.navigationId.isCurrentLoadingNavigation(it)
+                        event.isMainFrame && event.navigationId.isCurrentPendingNavigation(it)
                     val debugState = it.debugState.reduceDebug(
                         DebugAction.LoadError(
                             url = event.url,
@@ -279,7 +296,7 @@ class WorkbenchViewModel(
 
             is WebPageEvent.SslError -> {
                 _state.update {
-                    val completesActiveLoad = event.navigationId.isCurrentLoadingNavigation(it)
+                    val completesActiveLoad = event.navigationId.isCurrentPendingNavigation(it)
                     val debugState = it.debugState.reduceDebug(
                         DebugAction.SslError(
                             url = event.url,
@@ -397,10 +414,9 @@ class WorkbenchViewModel(
             SourceType.REMOTE_URL
         }
 
-    private fun Long.isCurrentLoadingNavigation(currentState: WorkbenchState = state.value): Boolean {
+    private fun Long.isCurrentPendingNavigation(currentState: WorkbenchState = state.value): Boolean {
         return this > 0L &&
             this == currentState.activeNavigationId &&
-            currentState.isLoading &&
             !currentState.activeNavigationCompleted
     }
 }

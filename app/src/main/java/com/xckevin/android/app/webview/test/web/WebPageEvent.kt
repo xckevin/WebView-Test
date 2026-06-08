@@ -4,6 +4,12 @@ sealed interface WebPageEvent {
     data class PageStarted(val navigationId: Long, val url: String) : WebPageEvent
     data class PageFinished(val navigationId: Long, val url: String, val title: String? = "") : WebPageEvent
     data class ProgressChanged(val navigationId: Long, val progress: Int) : WebPageEvent
+    data class NavigationStateChanged(
+        val navigationId: Long,
+        val url: String?,
+        val canGoBack: Boolean,
+        val canGoForward: Boolean,
+    ) : WebPageEvent
     data class Console(
         val level: String,
         val message: String,

@@ -188,13 +188,15 @@ fun WorkbenchScreen(
         localHtmlLauncher.launch(arrayOf("text/html", "text/*", "application/xhtml+xml"))
     }
 
-    BackHandler(enabled = state.isVideoFullscreen || state.isFullscreen) {
+    BackHandler(enabled = state.isVideoFullscreen || state.isFullscreen || state.canGoBack) {
         if (state.isVideoFullscreen && webViewController.hideCustomView()) {
             return@BackHandler
         }
         if (state.isFullscreen) {
             viewModel.toggleFullscreen()
+            return@BackHandler
         }
+        webViewController.goBack()
     }
 
     DisposableEffect(Unit) {

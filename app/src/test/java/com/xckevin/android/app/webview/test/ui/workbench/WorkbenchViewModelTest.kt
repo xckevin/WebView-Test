@@ -321,6 +321,105 @@ class WorkbenchViewModelTest {
         assertEquals(100, viewModel.state.value.loadProgress)
     }
 
+    @Test fun progressForCurrentNavigationDoesNotMoveBackward() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 70, navigationId = navigationId))
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 30, navigationId = navigationId))
+
+        assertEquals(70, viewModel.state.value.loadProgress)
+    }
+
+    @Test fun progressAt100HidesLoadingButStillAcceptsPageFinished() = runTest {
+        val viewModel = viewModel(clock = { 5100L })
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(WebPageEvent.ProgressChanged(progress = 100, navigationId = navigationId))
+
+        val progressedState = viewModel.state.value
+        assertEquals(100, progressedState.loadProgress)
+        assertFalse(progressedState.isLoading)
+        assertFalse(progressedState.activeNavigationCompleted)
+
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "https://active.example.com",
+                navigationId = navigationId,
+                title = "Active title",
+            )
+        )
+        advanceUntilIdle()
+
+        val finishedState = viewModel.state.value
+        assertEquals("Active title", finishedState.currentTitle)
+        assertTrue(finishedState.activeNavigationCompleted)
+        assertEquals(
+            HistoryItem(
+                id = 0L,
+                url = "https://active.example.com",
+                title = "Active title",
+                sourceType = SourceType.REMOTE_URL,
+                visitedAt = 5100L,
+            ),
+            historyRepository.insertedItems.single(),
+        )
+    }
+
+    @Test fun navigationStateChangedUpdatesUrlInputAndBackForwardAvailability() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://active.example.com")
+        val navigationId = viewModel.state.value.activeNavigationId
+        viewModel.onWebPageEvent(
+            WebPageEvent.PageFinished(
+                url = "https://active.example.com",
+                navigationId = navigationId,
+                title = "Active title",
+            )
+        )
+
+        viewModel.onWebPageEvent(
+            WebPageEvent.NavigationStateChanged(
+                navigationId = navigationId,
+                url = "https://active.example.com/pushed",
+                canGoBack = true,
+                canGoForward = false,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertEquals("https://active.example.com/pushed", state.currentUrl)
+        assertEquals("https://active.example.com/pushed", state.urlInput)
+        assertTrue(state.canGoBack)
+        assertFalse(state.canGoForward)
+        assertTrue(state.activeNavigationCompleted)
+    }
+
+    @Test fun staleNavigationStateChangedIsIgnored() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.loadUrl("https://stale.example.com")
+        val staleNavigationId = viewModel.state.value.activeNavigationId
+        viewModel.loadUrl("https://active.example.com")
+        viewModel.onWebPageEvent(
+            WebPageEvent.NavigationStateChanged(
+                navigationId = staleNavigationId,
+                url = "https://stale.example.com/back",
+                canGoBack = true,
+                canGoForward = true,
+            )
+        )
+
+        val state = viewModel.state.value
+        assertEquals("https://active.example.com", state.currentUrl)
+        assertEquals("https://active.example.com", state.urlInput)
+        assertFalse(state.canGoBack)
+        assertFalse(state.canGoForward)
+    }
+
     @Test fun mainFrameLoadErrorCompletesLoadingWithoutHistoryInsert() = runTest {
         val viewModel = viewModel()
 
