@@ -30,17 +30,14 @@
     <string name="action_view_resource_url">Ver URL do recurso</string>
     <string name="action_clear_history">Limpar histórico</string>
     <string name="action_open_tools">Open tools</string>
-    <string name="action_open_case">Open case</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
 
     <string name="url_placeholder">Insira a URL</string>
     <string name="error_invalid_http_url">Insira uma URL http ou https válida</string>
-    <string name="error_load_valid_url_before_saving">Carregue uma URL válida antes de salvar um caso</string>
 
     <string name="panel_config">Config.</string>
     <string name="panel_debug">Depuração</string>
-    <string name="panel_cases">Casos</string>
     <string name="panel_history">Histórico</string>
 
     <string name="config_section_runtime">Tempo de execução</string>
@@ -75,19 +72,6 @@
     <string name="enum_force_dark">Forçar escuro</string>
     <string name="enum_deny">Negar</string>
     <string name="enum_ask_every_time">Perguntar sempre</string>
-
-    <string name="cases_save_current">Salvar caso atual</string>
-    <string name="cases_name">Nome</string>
-    <string name="cases_note">Nota</string>
-    <string name="cases_empty">Nenhum caso salvo</string>
-    <string name="cases_delete">Excluir</string>
-    <string name="cases_delete_named">Delete %1$s</string>
-    <string name="cases_export">Exportar casos</string>
-    <string name="cases_import">Importar casos</string>
-    <string name="cases_exported">%1$d casos exportados</string>
-    <string name="cases_export_failed">Falha ao exportar casos: %1$s</string>
-    <string name="cases_imported_skipped">%1$d casos importados, %2$d conflitos ignorados</string>
-    <string name="cases_import_failed">Falha ao importar casos: %1$s</string>
 
     <string name="history_recent">Histórico recente</string>
     <string name="history_empty">Ainda não há histórico</string>
@@ -166,7 +150,6 @@
     <string name="settings_clear_cookies">Limpar cookies</string>
     <string name="settings_clear_webview_cache">Limpar cache do WebView</string>
     <string name="settings_debug_logs_session_scoped">Logs de depuração são limitados à sessão. Limpe no painel Debug da Bancada.</string>
-    <string name="settings_import_export">Importar e exportar</string>
     <string name="settings_reset_history_title">Redefinir histórico?</string>
     <string name="settings_reset_history_message">Isso limpa permanentemente o histórico de navegação armazenado por este app.</string>
     <string name="settings_reset_webview_defaults_title">Redefinir padrões do WebView?</string>

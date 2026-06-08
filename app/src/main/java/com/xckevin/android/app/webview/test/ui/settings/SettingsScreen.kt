@@ -23,7 +23,6 @@ import androidx.compose.material.icons.outlined.Cookie
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
-import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,7 +55,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.AppContainer
-import com.xckevin.android.app.webview.test.ui.cases.CaseImportExportActions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -204,14 +202,6 @@ fun SettingsScreen(
                     text = stringResource(R.string.settings_debug_logs_session_scoped),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            SettingsSection(title = stringResource(R.string.settings_import_export), icon = Icons.Outlined.SwapHoriz) {
-                CaseImportExportActions(
-                    testCaseRepository = container.testCaseRepository,
-                    contentResolver = context.contentResolver,
-                    onStatusMessage = viewModel::setStatusMessage,
                 )
             }
 

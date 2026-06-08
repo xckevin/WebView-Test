@@ -30,17 +30,14 @@
     <string name="action_view_resource_url">Показать URL ресурса</string>
     <string name="action_clear_history">Очистить историю</string>
     <string name="action_open_tools">Open tools</string>
-    <string name="action_open_case">Open case</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
 
     <string name="url_placeholder">Введите URL</string>
     <string name="error_invalid_http_url">Введите действительный URL http или https</string>
-    <string name="error_load_valid_url_before_saving">Загрузите действительный URL перед сохранением кейса</string>
 
     <string name="panel_config">Конфиг.</string>
     <string name="panel_debug">Отладка</string>
-    <string name="panel_cases">Кейсы</string>
     <string name="panel_history">История</string>
 
     <string name="config_section_runtime">Выполнение</string>
@@ -75,19 +72,6 @@
     <string name="enum_force_dark">Принудительно темная</string>
     <string name="enum_deny">Запретить</string>
     <string name="enum_ask_every_time">Спрашивать каждый раз</string>
-
-    <string name="cases_save_current">Сохранить текущий кейс</string>
-    <string name="cases_name">Имя</string>
-    <string name="cases_note">Заметка</string>
-    <string name="cases_empty">Нет сохраненных кейсов</string>
-    <string name="cases_delete">Удалить</string>
-    <string name="cases_delete_named">Delete %1$s</string>
-    <string name="cases_export">Экспортировать кейсы</string>
-    <string name="cases_import">Импортировать кейсы</string>
-    <string name="cases_exported">Экспортировано кейсов: %1$d</string>
-    <string name="cases_export_failed">Не удалось экспортировать кейсы: %1$s</string>
-    <string name="cases_imported_skipped">Импортировано кейсов: %1$d, пропущено конфликтов: %2$d</string>
-    <string name="cases_import_failed">Не удалось импортировать кейсы: %1$s</string>
 
     <string name="history_recent">Недавняя история</string>
     <string name="history_empty">Истории пока нет</string>
@@ -166,7 +150,6 @@
     <string name="settings_clear_cookies">Очистить cookies</string>
     <string name="settings_clear_webview_cache">Очистить кэш WebView</string>
     <string name="settings_debug_logs_session_scoped">Отладочные логи ограничены сеансом. Очищайте их на панели Debug в рабочей области.</string>
-    <string name="settings_import_export">Импорт и экспорт</string>
     <string name="settings_reset_history_title">Сбросить историю?</string>
     <string name="settings_reset_history_message">Это навсегда очистит историю просмотра, сохраненную приложением.</string>
     <string name="settings_reset_webview_defaults_title">Сбросить настройки WebView?</string>

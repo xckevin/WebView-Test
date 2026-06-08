@@ -30,17 +30,14 @@
     <string name="action_view_resource_url">Voir URL de la ressource</string>
     <string name="action_clear_history">Effacer l\'historique</string>
     <string name="action_open_tools">Open tools</string>
-    <string name="action_open_case">Open case</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
 
     <string name="url_placeholder">Saisir URL</string>
     <string name="error_invalid_http_url">Saisis une URL http ou https valide</string>
-    <string name="error_load_valid_url_before_saving">Charge une URL valide avant d\'enregistrer un cas</string>
 
     <string name="panel_config">Config.</string>
     <string name="panel_debug">Débogage</string>
-    <string name="panel_cases">Cas</string>
     <string name="panel_history">Historique</string>
 
     <string name="config_section_runtime">Exécution</string>
@@ -75,19 +72,6 @@
     <string name="enum_force_dark">Forcer sombre</string>
     <string name="enum_deny">Refuser</string>
     <string name="enum_ask_every_time">Demander à chaque fois</string>
-
-    <string name="cases_save_current">Enregistrer le cas actuel</string>
-    <string name="cases_name">Nom</string>
-    <string name="cases_note">Note</string>
-    <string name="cases_empty">Aucun cas enregistré</string>
-    <string name="cases_delete">Supprimer</string>
-    <string name="cases_delete_named">Delete %1$s</string>
-    <string name="cases_export">Exporter les cas</string>
-    <string name="cases_import">Importer les cas</string>
-    <string name="cases_exported">%1$d cas exportés</string>
-    <string name="cases_export_failed">Échec de l\'export des cas : %1$s</string>
-    <string name="cases_imported_skipped">%1$d cas importés, %2$d conflits ignorés</string>
-    <string name="cases_import_failed">Échec de l\'import des cas : %1$s</string>
 
     <string name="history_recent">Historique récent</string>
     <string name="history_empty">Aucun historique pour le moment</string>
@@ -166,7 +150,6 @@
     <string name="settings_clear_cookies">Effacer les cookies</string>
     <string name="settings_clear_webview_cache">Effacer le cache WebView</string>
     <string name="settings_debug_logs_session_scoped">Les logs de débogage sont limités à la session. Efface-les depuis le panneau Debug de l\'atelier.</string>
-    <string name="settings_import_export">Importer et exporter</string>
     <string name="settings_reset_history_title">Réinitialiser l\'historique ?</string>
     <string name="settings_reset_history_message">Cela efface définitivement l\'historique de navigation stocké par cette app.</string>
     <string name="settings_reset_webview_defaults_title">Réinitialiser les valeurs WebView ?</string>

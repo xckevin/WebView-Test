@@ -30,17 +30,14 @@
     <string name="action_view_resource_url">View resource URL</string>
     <string name="action_clear_history">Clear history</string>
     <string name="action_open_tools">Open tools</string>
-    <string name="action_open_case">Open case</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
 
     <string name="url_placeholder">Enter URL</string>
     <string name="error_invalid_http_url">Enter a valid http or https URL</string>
-    <string name="error_load_valid_url_before_saving">Load a valid URL before saving a case</string>
 
     <string name="panel_config">Config</string>
     <string name="panel_debug">Debug</string>
-    <string name="panel_cases">Cases</string>
     <string name="panel_history">History</string>
 
     <string name="config_section_runtime">Runtime</string>
@@ -75,19 +72,6 @@
     <string name="enum_force_dark">Force dark</string>
     <string name="enum_deny">Deny</string>
     <string name="enum_ask_every_time">Ask every time</string>
-
-    <string name="cases_save_current">Save current case</string>
-    <string name="cases_name">Name</string>
-    <string name="cases_note">Note</string>
-    <string name="cases_empty">No saved cases</string>
-    <string name="cases_delete">Delete</string>
-    <string name="cases_delete_named">Delete %1$s</string>
-    <string name="cases_export">Export cases</string>
-    <string name="cases_import">Import cases</string>
-    <string name="cases_exported">Exported %1$d cases</string>
-    <string name="cases_export_failed">Case export failed: %1$s</string>
-    <string name="cases_imported_skipped">Imported %1$d cases, skipped %2$d conflicts</string>
-    <string name="cases_import_failed">Case import failed: %1$s</string>
 
     <string name="history_recent">Recent history</string>
     <string name="history_empty">No history yet</string>
@@ -166,7 +150,6 @@
     <string name="settings_clear_cookies">Clear cookies</string>
     <string name="settings_clear_webview_cache">Clear WebView cache</string>
     <string name="settings_debug_logs_session_scoped">Debug logs are session scoped. Clear from the Workbench Debug panel.</string>
-    <string name="settings_import_export">Import &amp; export</string>
     <string name="settings_reset_history_title">Reset history?</string>
     <string name="settings_reset_history_message">This permanently clears the browsing history stored by this app.</string>
     <string name="settings_reset_webview_defaults_title">Reset WebView defaults?</string>

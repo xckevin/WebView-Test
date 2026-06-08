@@ -7,9 +7,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -23,9 +28,9 @@ import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
-import com.xckevin.android.app.webview.test.model.WebTestCase
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 import com.xckevin.android.app.webview.test.ui.theme.WebViewTestTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -77,6 +82,42 @@ class WorkbenchScreenTest {
     }
 
     @Test
+    fun urlBarHeightStaysStableWhenProgressAppears() {
+        var isLoading by mutableStateOf(false)
+
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                UrlBar(
+                    urlInput = "https://example.com",
+                    urlError = null,
+                    isLoading = isLoading,
+                    loadProgress = 50,
+                    isFullscreen = false,
+                    onOpenTools = {},
+                    onUrlInputChanged = {},
+                    onLoad = {},
+                    onScan = {},
+                    onRefresh = {},
+                    onOpenSettings = {},
+                    onToggleFullscreen = {},
+                    modifier = Modifier.testTag("url_bar"),
+                )
+            }
+        }
+
+        val idleBounds = composeRule.onNodeWithTag("url_bar").getUnclippedBoundsInRoot()
+        val idleHeight = idleBounds.bottom - idleBounds.top
+
+        composeRule.runOnIdle {
+            isLoading = true
+        }
+
+        val loadingBounds = composeRule.onNodeWithTag("url_bar").getUnclippedBoundsInRoot()
+        val loadingHeight = loadingBounds.bottom - loadingBounds.top
+        assertEquals(idleHeight, loadingHeight)
+    }
+
+    @Test
     fun configPanelShowsCoreToggles() {
         composeRule.setContent {
             WebViewTestTheme(darkTheme = false) {
@@ -120,51 +161,6 @@ class WorkbenchScreenTest {
     }
 
     @Test
-    fun casesPanelShowsSavedCase() {
-        composeRule.setContent {
-            WebViewTestTheme(darkTheme = false) {
-                CasesPanel(
-                    cases = listOf(fakeCase),
-                    canSaveCurrentCase = true,
-                    onOpenCase = {},
-                    onDeleteCase = {},
-                    onSaveCurrentCase = { _, _ -> },
-                    onImport = {},
-                    onExport = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithText(fakeCase.name).assertIsDisplayed()
-    }
-
-    @Test
-    fun casesPanelImportAndExportActionsInvokeCallbacks() {
-        var importClicked = false
-        var exportClicked = false
-
-        composeRule.setContent {
-            WebViewTestTheme(darkTheme = false) {
-                CasesPanel(
-                    cases = emptyList(),
-                    canSaveCurrentCase = false,
-                    onOpenCase = {},
-                    onDeleteCase = {},
-                    onSaveCurrentCase = { _, _ -> },
-                    onImport = { importClicked = true },
-                    onExport = { exportClicked = true },
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription(text(R.string.action_import)).performClick()
-        composeRule.onNodeWithContentDescription(text(R.string.action_export)).performClick()
-
-        assertTrue(importClicked)
-        assertTrue(exportClicked)
-    }
-
-    @Test
     fun historyPanelShowsVisitedUrl() {
         composeRule.setContent {
             WebViewTestTheme(darkTheme = false) {
@@ -192,7 +188,6 @@ class WorkbenchScreenTest {
                 ) {
                     WorkbenchFrame(
                         state = WorkbenchState(),
-                        cases = emptyList(),
                         history = emptyList(),
                         browser = { modifier, onOpenTools ->
                             Box(modifier.fillMaxSize()) {
@@ -212,11 +207,6 @@ class WorkbenchScreenTest {
                         onToggleFullscreen = {},
                         onSelectPanel = {},
                         onConfigChanged = {},
-                        onOpenCase = {},
-                        onDeleteCase = {},
-                        onSaveCurrentCase = { _, _ -> },
-                        onImportCases = {},
-                        onExportCases = {},
                         onOpenHistoryItem = {},
                         onClearHistory = {},
                         onClearDebugLogs = {},
@@ -264,7 +254,6 @@ class WorkbenchScreenTest {
                 ) {
                     WorkbenchFrame(
                         state = WorkbenchState(),
-                        cases = emptyList(),
                         history = emptyList(),
                         browser = { modifier, _ -> Box(modifier.fillMaxSize()) },
                         onGoBack = { backClicked = true },
@@ -273,11 +262,6 @@ class WorkbenchScreenTest {
                         onToggleFullscreen = { fullscreenClicked = true },
                         onSelectPanel = {},
                         onConfigChanged = {},
-                        onOpenCase = {},
-                        onDeleteCase = {},
-                        onSaveCurrentCase = { _, _ -> },
-                        onImportCases = {},
-                        onExportCases = {},
                         onOpenHistoryItem = {},
                         onClearHistory = {},
                         onClearDebugLogs = {},
@@ -304,17 +288,6 @@ class WorkbenchScreenTest {
 
     private fun text(@StringRes resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
-
-    private val fakeCase = WebTestCase(
-        id = 1L,
-        name = "Checkout regression",
-        url = "https://example.com/checkout",
-        note = "Saved from test",
-        config = WebTestConfig.default(),
-        createdAt = 1_700_000_000_000L,
-        updatedAt = 1_700_000_000_000L,
-        lastOpenedAt = null,
-    )
 
     private val fakeHistoryItem = HistoryItem(
         id = 1L,

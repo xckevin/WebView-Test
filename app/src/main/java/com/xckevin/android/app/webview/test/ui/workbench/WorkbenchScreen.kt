@@ -2,7 +2,6 @@ package com.xckevin.android.app.webview.test.ui.workbench
 
 import android.content.Context
 import android.content.ClipData
-import android.content.ClipDescription.MIMETYPE_TEXT_PLAIN
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -26,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.History
@@ -80,10 +78,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xckevin.android.app.webview.test.AppContainer
 import com.xckevin.android.app.webview.test.R
-import com.xckevin.android.app.webview.test.data.CaseImportExport
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.WebTestConfig
-import com.xckevin.android.app.webview.test.model.WebTestCase
 import com.xckevin.android.app.webview.test.ui.common.AppScaffold
 import com.xckevin.android.app.webview.test.web.WebPageEvent
 import com.xckevin.android.app.webview.test.web.WebContextMenuTarget
@@ -106,7 +102,6 @@ fun WorkbenchScreen(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return WorkbenchViewModel(
-                    testCaseRepository = container.testCaseRepository,
                     historyRepository = container.historyRepository,
                 ) as T
             }
@@ -114,7 +109,6 @@ fun WorkbenchScreen(
     }
     val viewModel: WorkbenchViewModel = viewModel(factory = factory)
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val cases by viewModel.cases.collectAsStateWithLifecycle(emptyList())
     val history by viewModel.history.collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -221,24 +215,6 @@ fun WorkbenchScreen(
         onScanResultConsumed()
     }
 
-    val importCasesFromClipboard: () -> Unit = {
-        coroutineScope.launch {
-            clipboard.getClipEntry()
-                ?.plainText()
-                ?.let(viewModel::importCasesJson)
-        }
-    }
-    val exportCasesToClipboard: () -> Unit = {
-        coroutineScope.launch {
-            clipboard.setClipEntry(
-                ClipData.newPlainText(
-                    "webview-test-cases",
-                    CaseImportExport.exportCases(cases),
-                ).toClipEntry()
-            )
-        }
-    }
-
     AppScaffold { innerPadding ->
         Box(
             modifier = Modifier
@@ -247,7 +223,6 @@ fun WorkbenchScreen(
         ) {
             WorkbenchFrame(
                 state = state,
-                cases = cases,
                 history = history,
                 browser = { browserModifier, onOpenTools ->
                     BrowserColumn(
@@ -277,11 +252,6 @@ fun WorkbenchScreen(
                 onToggleFullscreen = viewModel::toggleFullscreen,
                 onSelectPanel = viewModel::selectPanel,
                 onConfigChanged = viewModel::applyConfig,
-                onOpenCase = viewModel::openCase,
-                onDeleteCase = viewModel::deleteCase,
-                onSaveCurrentCase = viewModel::saveCurrentAsCase,
-                onImportCases = importCasesFromClipboard,
-                onExportCases = exportCasesToClipboard,
                 onOpenHistoryItem = viewModel::openHistory,
                 onClearHistory = viewModel::clearHistory,
                 onClearDebugLogs = viewModel::clearDebugLogs,
@@ -356,7 +326,6 @@ fun WorkbenchScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun WorkbenchFrame(
     state: WorkbenchState,
-    cases: List<WebTestCase>,
     history: List<HistoryItem>,
     browser: @Composable (Modifier, onOpenTools: () -> Unit) -> Unit,
     onGoBack: () -> Unit,
@@ -365,11 +334,6 @@ internal fun WorkbenchFrame(
     onToggleFullscreen: () -> Unit,
     onSelectPanel: (WorkbenchPanel) -> Unit,
     onConfigChanged: (WebTestConfig) -> Unit,
-    onOpenCase: (WebTestCase) -> Unit,
-    onDeleteCase: (WebTestCase) -> Unit,
-    onSaveCurrentCase: (String, String) -> Unit,
-    onImportCases: () -> Unit,
-    onExportCases: () -> Unit,
     onOpenHistoryItem: (HistoryItem) -> Unit,
     onClearHistory: () -> Unit,
     onClearDebugLogs: () -> Unit,
@@ -453,15 +417,9 @@ internal fun WorkbenchFrame(
                     VerticalDivider()
                     WorkbenchPanelSurface(
                         state = state,
-                        cases = cases,
                         history = history,
                         onSelectPanel = onSelectPanel,
                         onConfigChanged = onConfigChanged,
-                        onOpenCase = onOpenCase,
-                        onDeleteCase = onDeleteCase,
-                        onSaveCurrentCase = onSaveCurrentCase,
-                        onImportCases = onImportCases,
-                        onExportCases = onExportCases,
                         onOpenHistoryItem = onOpenHistoryItem,
                         onClearHistory = onClearHistory,
                         onClearDebugLogs = onClearDebugLogs,
@@ -477,16 +435,10 @@ internal fun WorkbenchFrame(
                 if (isDrawerOpen) {
                     WorkbenchDrawer(
                         state = state,
-                        cases = cases,
                         history = history,
                         onClose = closeTools,
                         onSelectPanel = onSelectPanel,
                         onConfigChanged = onConfigChanged,
-                        onOpenCase = onOpenCase,
-                        onDeleteCase = onDeleteCase,
-                        onSaveCurrentCase = onSaveCurrentCase,
-                        onImportCases = onImportCases,
-                        onExportCases = onExportCases,
                         onOpenHistoryItem = onOpenHistoryItem,
                         onClearHistory = onClearHistory,
                         onClearDebugLogs = onClearDebugLogs,
@@ -522,16 +474,10 @@ internal fun WorkbenchFrame(
 @Composable
 private fun WorkbenchDrawer(
     state: WorkbenchState,
-    cases: List<WebTestCase>,
     history: List<HistoryItem>,
     onClose: () -> Unit,
     onSelectPanel: (WorkbenchPanel) -> Unit,
     onConfigChanged: (WebTestConfig) -> Unit,
-    onOpenCase: (WebTestCase) -> Unit,
-    onDeleteCase: (WebTestCase) -> Unit,
-    onSaveCurrentCase: (String, String) -> Unit,
-    onImportCases: () -> Unit,
-    onExportCases: () -> Unit,
     onOpenHistoryItem: (HistoryItem) -> Unit,
     onClearHistory: () -> Unit,
     onClearDebugLogs: () -> Unit,
@@ -585,14 +531,8 @@ private fun WorkbenchDrawer(
             PanelContent(
                 selectedPanel = state.selectedPanel,
                 state = state,
-                cases = cases,
                 history = history,
                 onConfigChanged = onConfigChanged,
-                onOpenCase = onOpenCase,
-                onDeleteCase = onDeleteCase,
-                onSaveCurrentCase = onSaveCurrentCase,
-                onImportCases = onImportCases,
-                onExportCases = onExportCases,
                 onOpenHistoryItem = onOpenHistoryItem,
                 onClearHistory = onClearHistory,
                 onClearDebugLogs = onClearDebugLogs,
@@ -795,15 +735,9 @@ private fun BrowserColumn(
 @Composable
 private fun WorkbenchPanelSurface(
     state: WorkbenchState,
-    cases: List<WebTestCase>,
     history: List<HistoryItem>,
     onSelectPanel: (WorkbenchPanel) -> Unit,
     onConfigChanged: (WebTestConfig) -> Unit,
-    onOpenCase: (WebTestCase) -> Unit,
-    onDeleteCase: (WebTestCase) -> Unit,
-    onSaveCurrentCase: (String, String) -> Unit,
-    onImportCases: () -> Unit,
-    onExportCases: () -> Unit,
     onOpenHistoryItem: (HistoryItem) -> Unit,
     onClearHistory: () -> Unit,
     onClearDebugLogs: () -> Unit,
@@ -825,14 +759,8 @@ private fun WorkbenchPanelSurface(
             PanelContent(
                 selectedPanel = state.selectedPanel,
                 state = state,
-                cases = cases,
                 history = history,
                 onConfigChanged = onConfigChanged,
-                onOpenCase = onOpenCase,
-                onDeleteCase = onDeleteCase,
-                onSaveCurrentCase = onSaveCurrentCase,
-                onImportCases = onImportCases,
-                onExportCases = onExportCases,
                 onOpenHistoryItem = onOpenHistoryItem,
                 onClearHistory = onClearHistory,
                 onClearDebugLogs = onClearDebugLogs,
@@ -887,14 +815,8 @@ private fun PanelTabs(
 private fun PanelContent(
     selectedPanel: WorkbenchPanel,
     state: WorkbenchState,
-    cases: List<WebTestCase>,
     history: List<HistoryItem>,
     onConfigChanged: (WebTestConfig) -> Unit,
-    onOpenCase: (WebTestCase) -> Unit,
-    onDeleteCase: (WebTestCase) -> Unit,
-    onSaveCurrentCase: (String, String) -> Unit,
-    onImportCases: () -> Unit,
-    onExportCases: () -> Unit,
     onOpenHistoryItem: (HistoryItem) -> Unit,
     onClearHistory: () -> Unit,
     onClearDebugLogs: () -> Unit,
@@ -908,17 +830,6 @@ private fun PanelContent(
         WorkbenchPanel.CONFIG -> ConfigPanel(
             config = state.config,
             onConfigChanged = onConfigChanged,
-            modifier = modifier,
-        )
-
-        WorkbenchPanel.CASES -> CasesPanel(
-            cases = cases,
-            canSaveCurrentCase = state.currentUrl != null,
-            onOpenCase = onOpenCase,
-            onDeleteCase = onDeleteCase,
-            onSaveCurrentCase = onSaveCurrentCase,
-            onImport = onImportCases,
-            onExport = onExportCases,
             modifier = modifier,
         )
 
@@ -946,7 +857,6 @@ private val WorkbenchPanel.labelRes: Int
     get() = when (this) {
         WorkbenchPanel.CONFIG -> R.string.panel_config
         WorkbenchPanel.DEBUG -> R.string.panel_debug
-        WorkbenchPanel.CASES -> R.string.panel_cases
         WorkbenchPanel.HISTORY -> R.string.panel_history
     }
 
@@ -954,22 +864,8 @@ private val WorkbenchPanel.icon: ImageVector
     get() = when (this) {
         WorkbenchPanel.CONFIG -> Icons.Outlined.Tune
         WorkbenchPanel.DEBUG -> Icons.Outlined.BugReport
-        WorkbenchPanel.CASES -> Icons.Outlined.Folder
         WorkbenchPanel.HISTORY -> Icons.Outlined.History
     }
-
-private fun androidx.compose.ui.platform.ClipEntry.plainText(): String? {
-    val clipData = clipData.takeIf {
-        it.description.hasMimeType(MIMETYPE_TEXT_PLAIN) ||
-            it.description.hasMimeType("text/*")
-    } ?: return null
-    return clipData
-        .takeIf { it.itemCount > 0 }
-        ?.getItemAt(0)
-        ?.text
-        ?.toString()
-        ?.takeIf { it.isNotBlank() }
-}
 
 private fun Context.takePersistableReadPermissionIfAvailable(
     uri: Uri,

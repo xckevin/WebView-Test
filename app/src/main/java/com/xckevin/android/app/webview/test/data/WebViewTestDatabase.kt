@@ -4,17 +4,24 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.xckevin.android.app.webview.test.model.SourceType
 
 @Database(
-    entities = [TestCaseEntity::class, HistoryEntryEntity::class],
-    version = 1,
+    entities = [HistoryEntryEntity::class],
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(SourceTypeConverter::class)
 abstract class WebViewTestDatabase : RoomDatabase() {
-    abstract fun testCaseDao(): TestCaseDao
     abstract fun historyDao(): HistoryDao
+}
+
+val MIGRATION_1_2_DROP_TEST_CASES = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS test_cases")
+    }
 }
 
 class SourceTypeConverter {

@@ -1,11 +1,9 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
 import com.xckevin.android.app.webview.test.FakeHistoryRepository
-import com.xckevin.android.app.webview.test.FakeTestCaseRepository
 import com.xckevin.android.app.webview.test.debug.PageStatus
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
-import com.xckevin.android.app.webview.test.model.WebTestCase
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 import com.xckevin.android.app.webview.test.web.WebPageEvent
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +26,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkbenchViewModelTest {
-    private val testCaseRepository = FakeTestCaseRepository()
     private val historyRepository = FakeHistoryRepository()
     private val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()
 
@@ -84,103 +81,6 @@ class WorkbenchViewModelTest {
         assertEquals("ftp://example.com/file", state.urlInput)
         assertNull(state.currentUrl)
         assertNotNull(state.urlError)
-    }
-
-    @Test fun saveCurrentStateCreatesTestCase() = runTest {
-        val viewModel = viewModel(clock = { 1234L })
-        val config = WebTestConfig.default().copy(
-            javaScriptEnabled = false,
-            desktopMode = true,
-        )
-
-        viewModel.applyConfig(config)
-        viewModel.loadUrl("example.com")
-        viewModel.saveCurrentAsCase(name = "Home", note = "Regression target")
-        advanceUntilIdle()
-
-        val saved = testCaseRepository.upsertedCases.single()
-        assertEquals(0L, saved.id)
-        assertEquals("Home", saved.name)
-        assertEquals("https://example.com", saved.url)
-        assertEquals("Regression target", saved.note)
-        assertEquals(config, saved.config)
-        assertEquals(1234L, saved.createdAt)
-        assertEquals(1234L, saved.updatedAt)
-        assertNull(saved.lastOpenedAt)
-    }
-
-    @Test fun saveWithoutCurrentUrlSetsErrorAndDoesNotSave() = runTest {
-        val viewModel = viewModel()
-
-        viewModel.saveCurrentAsCase(name = "Missing", note = "")
-        advanceUntilIdle()
-
-        assertNotNull(viewModel.state.value.urlError)
-        assertEquals(emptyList<WebTestCase>(), testCaseRepository.upsertedCases)
-    }
-
-    @Test fun openCaseReplacesSingleSessionState() = runTest {
-        val viewModel = viewModel(clock = { 2000L })
-        val openedConfig = WebTestConfig.default().copy(
-            cookiesEnabled = false,
-            desktopMode = true,
-        )
-        val testCase = WebTestCase(
-            id = 42L,
-            name = "Saved",
-            url = "https://saved.example.com/path",
-            note = "Saved note",
-            config = openedConfig,
-            createdAt = 100L,
-            updatedAt = 100L,
-            lastOpenedAt = null,
-        )
-
-        viewModel.loadUrl("https://current.example.com")
-        viewModel.applyConfig(WebTestConfig.default().copy(javaScriptEnabled = false))
-        viewModel.openCase(testCase)
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertEquals("https://saved.example.com/path", state.currentUrl)
-        assertEquals("https://saved.example.com/path", state.urlInput)
-        assertEquals("", state.currentTitle)
-        assertEquals(openedConfig, state.config)
-        assertEquals("https://saved.example.com/path", state.requestedUrl)
-        assertEquals(2L, state.requestedNavigationId)
-        assertEquals(2L, state.activeNavigationId)
-        assertEquals(testCase.copy(lastOpenedAt = 2000L), testCaseRepository.upsertedCases.single())
-    }
-
-    @Test fun openLocalFileCaseKeepsLocalSourceType() = runTest {
-        val viewModel = viewModel(clock = { 2100L })
-        val testCase = WebTestCase(
-            id = 43L,
-            name = "Local fixture",
-            url = "content://provider/fixture.html",
-            note = "",
-            config = WebTestConfig.default(),
-            createdAt = 100L,
-            updatedAt = 100L,
-            lastOpenedAt = null,
-        )
-
-        viewModel.openCase(testCase)
-        val navigationId = viewModel.state.value.activeNavigationId
-        viewModel.onWebPageEvent(
-            WebPageEvent.PageFinished(
-                url = "content://provider/fixture.html",
-                navigationId = navigationId,
-                title = "Fixture",
-            )
-        )
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertEquals(SourceType.LOCAL_FILE, state.requestedSourceType)
-        assertEquals(SourceType.LOCAL_FILE, state.activeSourceType)
-        assertEquals(SourceType.LOCAL_FILE, historyRepository.insertedItems.single().sourceType)
-        assertEquals(testCase.copy(lastOpenedAt = 2100L), testCaseRepository.upsertedCases.single())
     }
 
     @Test fun stalePageFinishedIsIgnoredAndDoesNotInsertHistory() = runTest {
@@ -688,6 +588,10 @@ class WorkbenchViewModelTest {
         assertTrue(state.shouldShowFullscreenExitOverlay())
     }
 
+    @Test fun availableWorkbenchPanelsExcludeCases() {
+        assertFalse(WorkbenchPanel.entries.any { it.name == "CASES" })
+    }
+
     @Test fun videoFullscreenHidesUrlBarAndShowsExitOverlay() = runTest {
         val state = WorkbenchState(isVideoFullscreen = true)
 
@@ -698,7 +602,6 @@ class WorkbenchViewModelTest {
 
     private fun viewModel(clock: () -> Long = { 1000L }) =
         WorkbenchViewModel(
-            testCaseRepository = testCaseRepository,
             historyRepository = historyRepository,
             clock = clock,
         )

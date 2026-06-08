@@ -2,33 +2,27 @@ package com.xckevin.android.app.webview.test.ui.workbench
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xckevin.android.app.webview.test.data.CaseImportExport
 import com.xckevin.android.app.webview.test.data.HistoryRepository
-import com.xckevin.android.app.webview.test.data.TestCaseRepository
 import com.xckevin.android.app.webview.test.debug.DebugAction
 import com.xckevin.android.app.webview.test.debug.DebugReducer
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
-import com.xckevin.android.app.webview.test.model.WebTestCase
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 import com.xckevin.android.app.webview.test.util.UrlNormalizer
 import com.xckevin.android.app.webview.test.web.WebPageEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class WorkbenchViewModel(
-    private val testCaseRepository: TestCaseRepository,
     private val historyRepository: HistoryRepository,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkbenchState())
     val state: StateFlow<WorkbenchState> = _state.asStateFlow()
-    val cases = testCaseRepository.observeAll()
     val history = historyRepository.observeRecent()
     private var nextNavigationId = 1L
 
@@ -121,100 +115,6 @@ class WorkbenchViewModel(
                 activeNavigationCompleted = false,
                 urlError = null,
             )
-        }
-    }
-
-    fun saveCurrentAsCase(name: String, note: String) {
-        val currentState = state.value
-        val currentUrl = currentState.currentUrl
-        if (currentUrl == null) {
-            _state.update { it.copy(urlError = "Load a valid URL before saving a case") }
-            return
-        }
-
-        val now = clock()
-        val testCase = WebTestCase(
-            id = 0L,
-            name = name,
-            url = currentUrl,
-            note = note,
-            config = currentState.config,
-            createdAt = now,
-            updatedAt = now,
-            lastOpenedAt = null,
-        )
-        viewModelScope.launch {
-            testCaseRepository.upsert(testCase)
-        }
-    }
-
-    fun deleteCase(testCase: WebTestCase) {
-        viewModelScope.launch {
-            testCaseRepository.delete(testCase)
-        }
-    }
-
-    fun importCasesJson(raw: String) {
-        viewModelScope.launch {
-            runCatching {
-                val incoming = CaseImportExport.importCases(raw)
-                val existing = testCaseRepository.observeAll().first()
-                val conflictKeys = CaseImportExport.findConflicts(existing, incoming)
-                    .map { it.incoming.name.trim() to it.incoming.url.trim() }
-                    .toSet()
-                val casesToImport = incoming.filterNot { it.name.trim() to it.url.trim() in conflictKeys }
-                casesToImport.forEach { testCaseRepository.upsert(it) }
-                casesToImport.size to conflictKeys.size
-            }.onSuccess { (importedCount, skippedCount) ->
-                _state.update {
-                    it.copy(
-                        selectedPanel = WorkbenchPanel.CASES,
-                        debugState = it.debugState.reduceDebug(
-                            DebugAction.DebugMessage(
-                                message = "Imported $importedCount cases, skipped $skippedCount conflicts",
-                            )
-                        ),
-                    )
-                }
-            }.onFailure { error ->
-                _state.update {
-                    it.copy(
-                        selectedPanel = WorkbenchPanel.CASES,
-                        debugState = it.debugState.reduceDebug(
-                            DebugAction.DebugMessage(
-                                message = "Case import failed: ${error.message.orEmpty()}",
-                            )
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    fun openCase(testCase: WebTestCase) {
-        val navigationId = nextNavigationId()
-        val sourceType = testCase.url.sourceType()
-        _state.update {
-            it.copy(
-                urlInput = testCase.url,
-                currentUrl = testCase.url,
-                currentTitle = "",
-                config = testCase.config,
-                isLoading = true,
-                loadProgress = 0,
-                requestedUrl = testCase.url,
-                requestedNavigationId = navigationId,
-                requestedSourceType = sourceType,
-                activeNavigationId = navigationId,
-                activeSourceType = sourceType,
-                activeNavigationCompleted = false,
-                isFullscreen = testCase.config.startFullscreen,
-                isVideoFullscreen = false,
-                urlError = null,
-            )
-        }
-        viewModelScope.launch {
-            testCaseRepository.upsert(testCase.copy(lastOpenedAt = clock()))
         }
     }
 

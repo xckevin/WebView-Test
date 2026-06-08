@@ -7,9 +7,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.room.Room
 import com.xckevin.android.app.webview.test.data.AppSettingsStore
 import com.xckevin.android.app.webview.test.data.HistoryRepository
+import com.xckevin.android.app.webview.test.data.MIGRATION_1_2_DROP_TEST_CASES
 import com.xckevin.android.app.webview.test.data.RoomHistoryRepository
-import com.xckevin.android.app.webview.test.data.RoomTestCaseRepository
-import com.xckevin.android.app.webview.test.data.TestCaseRepository
 import com.xckevin.android.app.webview.test.data.WebViewTestDatabase
 
 class AppContainer(context: Context) {
@@ -19,10 +18,9 @@ class AppContainer(context: Context) {
         applicationContext,
         WebViewTestDatabase::class.java,
         "webview_test.db",
-    ).build()
-
-    val testCaseRepository: TestCaseRepository =
-        RoomTestCaseRepository(database.testCaseDao())
+    )
+        .addMigrations(MIGRATION_1_2_DROP_TEST_CASES)
+        .build()
 
     val historyRepository: HistoryRepository =
         RoomHistoryRepository(database.historyDao())

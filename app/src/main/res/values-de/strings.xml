@@ -30,17 +30,14 @@
     <string name="action_view_resource_url">Ressourcen-URL anzeigen</string>
     <string name="action_clear_history">Verlauf leeren</string>
     <string name="action_open_tools">Open tools</string>
-    <string name="action_open_case">Open case</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
 
     <string name="url_placeholder">URL eingeben</string>
     <string name="error_invalid_http_url">Gib eine gültige http- oder https-URL ein</string>
-    <string name="error_load_valid_url_before_saving">Lade eine gültige URL, bevor du einen Fall speicherst</string>
 
     <string name="panel_config">Konfig.</string>
     <string name="panel_debug">Debug</string>
-    <string name="panel_cases">Fälle</string>
     <string name="panel_history">Verlauf</string>
 
     <string name="config_section_runtime">Laufzeit</string>
@@ -75,19 +72,6 @@
     <string name="enum_force_dark">Dunkel erzwingen</string>
     <string name="enum_deny">Ablehnen</string>
     <string name="enum_ask_every_time">Jedes Mal fragen</string>
-
-    <string name="cases_save_current">Aktuellen Fall speichern</string>
-    <string name="cases_name">Name</string>
-    <string name="cases_note">Notiz</string>
-    <string name="cases_empty">Keine gespeicherten Fälle</string>
-    <string name="cases_delete">Löschen</string>
-    <string name="cases_delete_named">Delete %1$s</string>
-    <string name="cases_export">Fälle exportieren</string>
-    <string name="cases_import">Fälle importieren</string>
-    <string name="cases_exported">%1$d Fälle exportiert</string>
-    <string name="cases_export_failed">Fallexport fehlgeschlagen: %1$s</string>
-    <string name="cases_imported_skipped">%1$d Fälle importiert, %2$d Konflikte übersprungen</string>
-    <string name="cases_import_failed">Fallimport fehlgeschlagen: %1$s</string>
 
     <string name="history_recent">Letzter Verlauf</string>
     <string name="history_empty">Noch kein Verlauf</string>
@@ -166,7 +150,6 @@
     <string name="settings_clear_cookies">Cookies löschen</string>
     <string name="settings_clear_webview_cache">WebView-Cache leeren</string>
     <string name="settings_debug_logs_session_scoped">Debug-Logs gelten nur für die Sitzung. Lösche sie im Debug-Bereich des Arbeitsbereichs.</string>
-    <string name="settings_import_export">Importieren und exportieren</string>
     <string name="settings_reset_history_title">Verlauf zurücksetzen?</string>
     <string name="settings_reset_history_message">Dadurch wird der von dieser App gespeicherte Browserverlauf dauerhaft gelöscht.</string>
     <string name="settings_reset_webview_defaults_title">WebView-Standards zurücksetzen?</string>

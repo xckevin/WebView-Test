@@ -24,4 +24,4 @@ data class WorkbenchState(
     val debugState: DebugState = DebugState(),
 )
 
-enum class WorkbenchPanel { CONFIG, DEBUG, CASES, HISTORY }
+enum class WorkbenchPanel { CONFIG, DEBUG, HISTORY }
