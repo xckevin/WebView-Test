@@ -10,8 +10,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.xckevin.android.app.webview.test.R
@@ -161,7 +164,9 @@ class WorkbenchScreenTest {
             }
         }
 
-        composeRule.onAllNodesWithText(text(R.string.debug_group_logs)).assertCountEquals(2)
+        composeRule.onAllNodesWithText("Overview").assertCountEquals(1)
+        composeRule.onAllNodesWithText("Timeline").assertCountEquals(1)
+        composeRule.onAllNodesWithText(text(R.string.debug_group_logs)).assertCountEquals(1)
         composeRule.onAllNodesWithText(text(R.string.debug_group_storage)).assertCountEquals(1)
         composeRule.onAllNodesWithText(text(R.string.debug_group_execute)).assertCountEquals(1)
         composeRule.onAllNodesWithText(text(R.string.debug_tab_console)).assertCountEquals(0)
@@ -292,21 +297,23 @@ class WorkbenchScreenTest {
 
         composeRule.onNodeWithText(text(R.string.action_open_tools)).performClick()
 
-        composeRule.onNodeWithText(text(R.string.panel_config)).assertIsDisplayed()
-        composeRule.onNodeWithText(text(R.string.config_javascript)).assertIsDisplayed()
+        composeRule.onNodeWithText("Overview").assertIsDisplayed()
+        composeRule.onNodeWithText("Timeline").assertIsDisplayed()
+        composeRule.onAllNodesWithText(text(R.string.panel_config)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(text(R.string.config_javascript)).assertCountEquals(0)
         composeRule.onNodeWithTag("workbench_drawer").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription(text(R.string.action_close)).performClick()
         composeRule.waitForIdle()
 
-        composeRule.onAllNodesWithText(text(R.string.config_javascript)).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Overview").assertCountEquals(0)
         composeRule.onNodeWithText(text(R.string.action_open_tools)).performClick()
 
         assertTrue(openClicks >= 2)
     }
 
     @Test
-    fun compactDrawerClosesAfterOpeningHistoryItem() {
+    fun floatingBrowserControlsOpenHistoryPage() {
         var openedItem: HistoryItem? = null
 
         composeRule.setContent {
@@ -317,7 +324,7 @@ class WorkbenchScreenTest {
                         .height(640.dp),
                 ) {
                     WorkbenchFrame(
-                        state = WorkbenchState(selectedPanel = WorkbenchPanel.HISTORY),
+                        state = WorkbenchState(),
                         history = listOf(fakeHistoryItem),
                         browser = { modifier, onOpenTools ->
                             Box(modifier.fillMaxSize()) {
@@ -346,14 +353,57 @@ class WorkbenchScreenTest {
             }
         }
 
-        composeRule.onNodeWithText(text(R.string.action_open_tools)).performClick()
-        composeRule.onNodeWithTag("workbench_drawer").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(text(R.string.panel_history)).performClick()
+        composeRule.onNodeWithTag("workbench_history_page").assertIsDisplayed()
 
         composeRule.onNodeWithText(fakeHistoryItem.url).performClick()
         composeRule.waitForIdle()
 
         assertEquals(fakeHistoryItem, openedItem)
         composeRule.onAllNodesWithText(fakeHistoryItem.url).assertCountEquals(0)
+    }
+
+    @Test
+    fun wideWorkbenchPanelPromotesDebugModes() {
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .width(1000.dp)
+                            .height(640.dp),
+                    ) {
+                        WorkbenchFrame(
+                            state = WorkbenchState(),
+                            history = emptyList(),
+                            browser = { modifier, _ -> Box(modifier.fillMaxSize()) },
+                            onGoBack = {},
+                            onGoForward = {},
+                            onRefresh = {},
+                            onToggleFullscreen = {},
+                            onSelectPanel = {},
+                            onConfigChanged = {},
+                            onOpenHistoryItem = {},
+                            onClearHistory = {},
+                            onDeleteHistoryItem = {},
+                            onClearDebugLogs = {},
+                            onEvaluateJavaScript = { _, callback -> callback("") },
+                            onReadCookies = {},
+                            onClearCookies = {},
+                            onClearWebViewCache = {},
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Overview").assertIsDisplayed()
+        composeRule.onNodeWithText("Timeline").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Network").assertCountEquals(1)
+        composeRule.onAllNodesWithText(text(R.string.panel_config)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(text(R.string.panel_history)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(text(R.string.config_javascript)).assertCountEquals(0)
     }
 
     @Test

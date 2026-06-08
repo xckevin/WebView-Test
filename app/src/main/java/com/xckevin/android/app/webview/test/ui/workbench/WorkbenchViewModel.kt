@@ -3,6 +3,7 @@ package com.xckevin.android.app.webview.test.ui.workbench
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xckevin.android.app.webview.test.data.HistoryRepository
+import com.xckevin.android.app.webview.test.data.SettingsRepository
 import com.xckevin.android.app.webview.test.debug.DebugAction
 import com.xckevin.android.app.webview.test.debug.DebugReducer
 import com.xckevin.android.app.webview.test.debug.DebugState
@@ -20,12 +21,23 @@ import kotlinx.coroutines.launch
 
 class WorkbenchViewModel(
     private val historyRepository: HistoryRepository,
+    settingsRepository: SettingsRepository? = null,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkbenchState())
     val state: StateFlow<WorkbenchState> = _state.asStateFlow()
     val history = historyRepository.observeRecent()
     private var nextNavigationId = 1L
+
+    init {
+        settingsRepository?.let { repository ->
+            viewModelScope.launch {
+                repository.settings.collect { settings ->
+                    _state.update { it.copy(config = settings.defaultConfig) }
+                }
+            }
+        }
+    }
 
     fun onUrlInputChanged(value: String) {
         _state.update { it.copy(urlInput = value, urlError = null) }
@@ -293,6 +305,8 @@ class WorkbenchViewModel(
                                 url = event.url,
                                 statusCode = event.statusCode,
                                 reason = event.reason,
+                                responseHeaders = event.responseHeaders,
+                                responseBody = event.responseBody,
                                 navigationId = event.navigationId,
                                 isMainFrame = event.isMainFrame,
                             )
@@ -331,6 +345,9 @@ class WorkbenchViewModel(
                         debugState = it.debugState.reduceDebug(
                             DebugAction.ResourceRequest(
                                 url = event.url,
+                                method = event.method,
+                                requestHeaders = event.requestHeaders,
+                                requestBody = event.requestBody,
                                 isMainFrame = event.isMainFrame,
                                 navigationId = event.navigationId,
                             )
@@ -374,6 +391,21 @@ class WorkbenchViewModel(
                     )
                 }
             }
+
+            is WebPageEvent.UserFlow -> {
+                _state.update {
+                    it.copy(
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.UserFlowEvent(
+                                kind = event.kind.toUserFlowKind(),
+                                summary = event.summary,
+                                detail = event.detail,
+                                navigationId = event.navigationId,
+                            )
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -381,11 +413,39 @@ class WorkbenchViewModel(
         _state.update { it.copy(debugState = it.debugState.reduceDebug(DebugAction.ClearLogs(timestamp = clock()))) }
     }
 
+    fun clearDebug(scope: com.xckevin.android.app.webview.test.debug.DebugClearScope) {
+        _state.update {
+            it.copy(
+                debugState = it.debugState.reduceDebug(
+                    DebugAction.Clear(
+                        scope = scope,
+                        navigationId = it.activeNavigationId,
+                    )
+                )
+            )
+        }
+    }
+
     fun addDebugMessage(message: String) {
         _state.update {
             it.copy(
                 debugState = it.debugState.reduceDebug(
                     DebugAction.DebugMessage(message = message)
+                )
+            )
+        }
+    }
+
+    fun addUserFlow(kind: com.xckevin.android.app.webview.test.debug.UserFlowKind, summary: String, detail: String = "") {
+        _state.update {
+            it.copy(
+                debugState = it.debugState.reduceDebug(
+                    DebugAction.UserFlowEvent(
+                        kind = kind,
+                        summary = summary,
+                        detail = detail,
+                        navigationId = it.activeNavigationId,
+                    )
                 )
             )
         }
@@ -416,6 +476,7 @@ class WorkbenchViewModel(
     private fun DebugState.reduceDebug(action: DebugAction): DebugState {
         val timestampedAction = when (action) {
             is DebugAction.ClearLogs -> action
+            is DebugAction.Clear -> action.copy(timestamp = clock())
             is DebugAction.DebugMessage -> action.copy(timestamp = clock())
             is DebugAction.ConsoleEvent -> action.copy(timestamp = clock())
             is DebugAction.PageStarted -> action.copy(timestamp = clock())
@@ -428,6 +489,7 @@ class WorkbenchViewModel(
             is DebugAction.DownloadRequested -> action.copy(timestamp = clock())
             is DebugAction.DownloadStatusChanged -> action.copy(timestamp = clock())
             is DebugAction.JavaScriptResult -> action.copy(timestamp = clock())
+            is DebugAction.UserFlowEvent -> action.copy(timestamp = clock())
         }
         return DebugReducer.reduce(this, timestampedAction)
     }
@@ -450,4 +512,8 @@ class WorkbenchViewModel(
     private fun String.toDownloadStatus(): DownloadStatus =
         runCatching { DownloadStatus.valueOf(uppercase()) }
             .getOrDefault(DownloadStatus.UNKNOWN)
+
+    private fun String.toUserFlowKind() =
+        runCatching { com.xckevin.android.app.webview.test.debug.UserFlowKind.valueOf(uppercase()) }
+            .getOrDefault(com.xckevin.android.app.webview.test.debug.UserFlowKind.GENERAL)
 }

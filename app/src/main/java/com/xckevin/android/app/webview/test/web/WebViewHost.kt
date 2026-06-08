@@ -247,6 +247,18 @@ fun WebViewHost(
             )
         }
     }
+    val userFlowSink: (String, String, String) -> Unit = remember {
+        { kind, summary, detail ->
+            eventSink(
+                WebPageEvent.UserFlow(
+                    kind = kind,
+                    summary = summary,
+                    detail = detail,
+                    navigationId = navigationTracker.activeNavigationId(),
+                )
+            )
+        }
+    }
 
     Box(modifier = if (isFullscreen) modifier.fillMaxSize() else modifier) {
         AndroidView(
@@ -259,6 +271,7 @@ fun WebViewHost(
                             currentOnOpenDocument.value(mimeTypes, onResult)
                         },
                         onMessage = messageSink,
+                        onUserFlow = { summary, detail -> userFlowSink("FILE_CHOOSER", summary, detail) },
                     )
                     val fullscreenVideoHandler = FullscreenVideoHandler { view ->
                         fullscreenVideoView = view
@@ -271,6 +284,7 @@ fun WebViewHost(
                         },
                         showPrompt = { prompt -> currentOnWebPermissionPrompt.value(prompt) },
                         onMessage = messageSink,
+                        onUserFlow = { summary, detail -> userFlowSink("PERMISSION", summary, detail) },
                         textProvider = currentPermissionTextProvider.value,
                     )
                     val downloadHandler = DownloadHandler(
@@ -278,6 +292,7 @@ fun WebViewHost(
                         navigationTracker = navigationTracker,
                         onEvent = eventSink,
                         onMessage = messageSink,
+                        onUserFlow = { summary, detail -> userFlowSink("DOWNLOAD", summary, detail) },
                     )
 
                     controller.attach(webView)

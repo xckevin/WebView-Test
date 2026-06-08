@@ -42,6 +42,7 @@ class WebPermissionHandler(
     private val requestRuntimePermissions: (Array<String>, (Map<String, Boolean>) -> Unit) -> Unit,
     private val showPrompt: (WebPermissionPrompt?) -> Unit,
     private val onMessage: (String) -> Unit = {},
+    private val onUserFlow: (String, String) -> Unit = { _, _ -> },
     private val textProvider: WebPermissionTextProvider = WebPermissionTextProvider.English,
 ) {
     private var pendingMediaRequest: PendingRequest? = null
@@ -61,6 +62,7 @@ class WebPermissionHandler(
         if (supportedResources.isEmpty()) {
             request.deny()
             onMessage("Web permission denied: unsupported resources")
+            onUserFlow("Web permission denied: unsupported resources", requestedResources.joinToString())
             return
         }
 
@@ -71,6 +73,7 @@ class WebPermissionHandler(
         if (allowedResources.isEmpty()) {
             request.deny()
             onMessage("Web permission denied by policy")
+            onUserFlow("Web permission denied by policy", supportedResources.permissionLabel())
             return
         }
 
@@ -109,6 +112,7 @@ class WebPermissionHandler(
                         pendingRequest.deny()
                         if (pendingRequest.isCompleted) {
                             onMessage("Web permission denied by user")
+                            onUserFlow("Web permission denied by user", allowedResources.permissionLabel())
                         }
                     },
                 )
@@ -126,6 +130,7 @@ class WebPermissionHandler(
         pendingMediaRequest = null
         showPrompt(null)
         onMessage("Web permission request canceled")
+        onUserFlow("Web permission request canceled", "")
     }
 
     fun onGeolocationPermissionsShowPrompt(
@@ -140,6 +145,7 @@ class WebPermissionHandler(
             WebPermissionPolicy.DENY -> {
                 callback.invoke(origin, false, false)
                 onMessage("Geolocation denied by policy")
+                onUserFlow("Geolocation denied by policy", origin.orEmpty())
             }
 
             WebPermissionPolicy.ALLOW -> {
@@ -163,6 +169,7 @@ class WebPermissionHandler(
                             pendingRequest.deny()
                             if (pendingRequest.isCompleted) {
                                 onMessage("Geolocation denied by user")
+                                onUserFlow("Geolocation denied by user", origin.orEmpty())
                             }
                         },
                     )
@@ -177,6 +184,7 @@ class WebPermissionHandler(
         pendingGeolocationRequest = null
         showPrompt(null)
         onMessage("Geolocation prompt hidden")
+        onUserFlow("Geolocation prompt hidden", "")
     }
 
     fun cancelPendingPrompts() {
@@ -209,11 +217,16 @@ class WebPermissionHandler(
                         "; denied ${deniedResources.permissionLabel()}"
                     }
                     onMessage("Web permission granted: ${grantedResources.permissionLabel()}$suffix")
+                    onUserFlow(
+                        "Web permission granted: ${grantedResources.permissionLabel()}",
+                        "runtime=${runtimePermissions.joinToString()}$suffix",
+                    )
                 }
             } else {
                 pendingRequest.deny()
                 if (pendingRequest.isCompleted) {
                     onMessage("Web permission denied: Android runtime permission missing")
+                    onUserFlow("Web permission denied: Android runtime permission missing", runtimePermissions.joinToString())
                 }
             }
             showPrompt(null)
@@ -235,11 +248,13 @@ class WebPermissionHandler(
                 pendingRequest.grant(emptyArray())
                 if (pendingRequest.isCompleted) {
                     onMessage("Geolocation granted")
+                    onUserFlow("Geolocation granted", "")
                 }
             } else {
                 pendingRequest.deny()
                 if (pendingRequest.isCompleted) {
                     onMessage("Geolocation denied: Android runtime permission missing")
+                    onUserFlow("Geolocation denied: Android runtime permission missing", Manifest.permission.ACCESS_FINE_LOCATION)
                 }
             }
             showPrompt(null)

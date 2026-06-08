@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
-import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,12 +26,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -45,7 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -61,7 +58,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -81,6 +77,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xckevin.android.app.webview.test.AppContainer
 import com.xckevin.android.app.webview.test.R
+import com.xckevin.android.app.webview.test.debug.DebugClearScope
+import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.debug.UserFlowKind
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 import com.xckevin.android.app.webview.test.ui.common.AppScaffold
@@ -106,6 +105,7 @@ fun WorkbenchScreen(
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return WorkbenchViewModel(
                     historyRepository = container.historyRepository,
+                    settingsRepository = container.settingsStore,
                 ) as T
             }
         }
@@ -182,11 +182,13 @@ fun WorkbenchScreen(
     val clearCookies: () -> Unit = {
         webViewController.clearCookies { removed ->
             viewModel.addDebugMessage("Cookies cleared: $removed")
+            viewModel.addUserFlow(UserFlowKind.COOKIE, "Cookies cleared", "removed=$removed")
         }
     }
     val clearWebViewCache: () -> Unit = {
         webViewController.clearCache()
         viewModel.addDebugMessage("WebView cache cleared")
+        viewModel.addUserFlow(UserFlowKind.CACHE, "WebView cache cleared")
     }
     val openLocalHtml: () -> Unit = {
         localHtmlLauncher.launch(arrayOf("text/html", "text/*", "application/xhtml+xml"))
@@ -291,6 +293,7 @@ fun WorkbenchScreen(
                 onClearHistory = viewModel::clearHistory,
                 onDeleteHistoryItem = viewModel::deleteHistoryItem,
                 onClearDebugLogs = viewModel::clearDebugLogs,
+                onClearDebug = viewModel::clearDebug,
                 onEvaluateJavaScript = evaluateJavaScript,
                 onReadCookies = readCookies,
                 onClearCookies = clearCookies,
@@ -318,9 +321,11 @@ fun WorkbenchScreen(
                     if (!webViewController.downloadUrl(target.url)) {
                         viewModel.addDebugMessage("Download skipped: unsupported URL scheme")
                     }
+                    viewModel.addUserFlow(UserFlowKind.CONTEXT_MENU, "Context menu download requested", target.url)
                 },
                 onViewResourceUrl = { target ->
                     viewModel.addDebugMessage("${target.label} URL: ${target.url}")
+                    viewModel.addUserFlow(UserFlowKind.CONTEXT_MENU, "Context menu resource inspected", target.url)
                 },
             )
 
@@ -374,6 +379,7 @@ internal fun WorkbenchFrame(
     onClearHistory: () -> Unit,
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
+    onClearDebug: (DebugClearScope) -> Unit = {},
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
@@ -388,6 +394,7 @@ internal fun WorkbenchFrame(
         val focusManager = LocalFocusManager.current
         val keyboardController = LocalSoftwareKeyboardController.current
         var isDrawerOpen by remember { mutableStateOf(false) }
+        var isHistoryPageOpen by remember { mutableStateOf(false) }
         val browserPadding = when {
             !showPanels -> Modifier
             useSidePanel -> Modifier.padding(end = sidePanelWidth)
@@ -432,6 +439,7 @@ internal fun WorkbenchFrame(
                         onGoBack = onGoBack,
                         onGoForward = onGoForward,
                         onRefresh = onRefresh,
+                        onOpenHistory = { isHistoryPageOpen = true },
                         onToggleFullscreen = onToggleFullscreen,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -461,6 +469,7 @@ internal fun WorkbenchFrame(
                         onClearHistory = onClearHistory,
                         onDeleteHistoryItem = onDeleteHistoryItem,
                         onClearDebugLogs = onClearDebugLogs,
+                        onClearDebug = onClearDebug,
                         onEvaluateJavaScript = onEvaluateJavaScript,
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
@@ -484,6 +493,7 @@ internal fun WorkbenchFrame(
                         onClearHistory = onClearHistory,
                         onDeleteHistoryItem = onDeleteHistoryItem,
                         onClearDebugLogs = onClearDebugLogs,
+                        onClearDebug = onClearDebug,
                         onEvaluateJavaScript = onEvaluateJavaScript,
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
@@ -510,6 +520,22 @@ internal fun WorkbenchFrame(
         } else {
             browserContent()
         }
+
+        if (isHistoryPageOpen && !state.isVideoFullscreen) {
+            HistoryPage(
+                history = history,
+                onClose = { isHistoryPageOpen = false },
+                onOpenHistoryItem = { item ->
+                    onOpenHistoryItem(item)
+                    isHistoryPageOpen = false
+                },
+                onClearHistory = onClearHistory,
+                onDeleteHistoryItem = onDeleteHistoryItem,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(5f),
+            )
+        }
     }
 }
 
@@ -524,6 +550,7 @@ private fun WorkbenchDrawer(
     onClearHistory: () -> Unit,
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
+    onClearDebug: (DebugClearScope) -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
@@ -555,13 +582,13 @@ private fun WorkbenchDrawer(
                         onClick = { onSelectPanel(panel) },
                         icon = {
                             Icon(
-                                panel.icon,
+                                panel.debugMode.icon,
                                 contentDescription = null,
                             )
                         },
                         label = {
                             Text(
-                                text = stringResource(panel.labelRes),
+                                text = panel.debugMode.label(state.debugState),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelSmall,
@@ -580,6 +607,7 @@ private fun WorkbenchDrawer(
                 onClearHistory = onClearHistory,
                 onDeleteHistoryItem = onDeleteHistoryItem,
                 onClearDebugLogs = onClearDebugLogs,
+                onClearDebug = onClearDebug,
                 onEvaluateJavaScript = onEvaluateJavaScript,
                 onReadCookies = onReadCookies,
                 onClearCookies = onClearCookies,
@@ -593,11 +621,49 @@ private fun WorkbenchDrawer(
 }
 
 @Composable
+private fun HistoryPage(
+    history: List<HistoryItem>,
+    onClose: () -> Unit,
+    onOpenHistoryItem: (HistoryItem) -> Unit,
+    onClearHistory: () -> Unit,
+    onDeleteHistoryItem: (HistoryItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onClose)
+    Surface(
+        modifier = modifier.testTag("workbench_history_page"),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            PanelHeader(
+                title = stringResource(R.string.panel_history),
+                actions = {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.action_close),
+                        )
+                    }
+                },
+            )
+            HistoryPanel(
+                history = history,
+                onOpenHistoryItem = onOpenHistoryItem,
+                onClearHistory = onClearHistory,
+                onDeleteHistoryItem = onDeleteHistoryItem,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
 private fun FloatingBrowserControls(
     isFullscreen: Boolean,
     onGoBack: () -> Unit,
     onGoForward: () -> Unit,
     onRefresh: () -> Unit,
+    onOpenHistory: () -> Unit,
     onToggleFullscreen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -638,6 +704,15 @@ private fun FloatingBrowserControls(
                 Icon(
                     Icons.Outlined.Refresh,
                     contentDescription = stringResource(R.string.action_refresh),
+                )
+            }
+            IconButton(
+                onClick = onOpenHistory,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Icon(
+                    Icons.Outlined.History,
+                    contentDescription = stringResource(R.string.panel_history),
                 )
             }
             IconButton(
@@ -790,6 +865,7 @@ private fun WorkbenchPanelSurface(
     onClearHistory: () -> Unit,
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
+    onClearDebug: (DebugClearScope) -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
@@ -803,6 +879,7 @@ private fun WorkbenchPanelSurface(
         Column {
             PanelTabs(
                 selectedPanel = state.selectedPanel,
+                debugState = state.debugState,
                 onSelectPanel = onSelectPanel,
             )
             PanelContent(
@@ -814,6 +891,7 @@ private fun WorkbenchPanelSurface(
                 onClearHistory = onClearHistory,
                 onDeleteHistoryItem = onDeleteHistoryItem,
                 onClearDebugLogs = onClearDebugLogs,
+                onClearDebug = onClearDebug,
                 onEvaluateJavaScript = onEvaluateJavaScript,
                 onReadCookies = onReadCookies,
                 onClearCookies = onClearCookies,
@@ -827,14 +905,16 @@ private fun WorkbenchPanelSurface(
 @Composable
 private fun PanelTabs(
     selectedPanel: WorkbenchPanel,
+    debugState: DebugState,
     onSelectPanel: (WorkbenchPanel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SecondaryTabRow(
+    PrimaryScrollableTabRow(
         selectedTabIndex = WorkbenchPanel.entries.indexOf(selectedPanel),
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        edgePadding = 8.dp,
     ) {
         WorkbenchPanel.entries.forEach { panel ->
             Tab(
@@ -842,7 +922,7 @@ private fun PanelTabs(
                 onClick = { onSelectPanel(panel) },
                 text = {
                     Text(
-                        text = stringResource(panel.labelRes),
+                        text = panel.debugMode.label(debugState),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.labelMedium,
@@ -850,7 +930,7 @@ private fun PanelTabs(
                 },
                 icon = {
                     Icon(
-                        panel.icon,
+                        panel.debugMode.icon,
                         contentDescription = null,
                     )
                 },
@@ -871,54 +951,39 @@ private fun PanelContent(
     onClearHistory: () -> Unit,
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
+    onClearDebug: (DebugClearScope) -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (selectedPanel) {
-        WorkbenchPanel.CONFIG -> ConfigPanel(
-            config = state.config,
-            onConfigChanged = onConfigChanged,
-            modifier = modifier,
-        )
-
-        WorkbenchPanel.HISTORY -> HistoryPanel(
-            history = history,
-            onOpenHistoryItem = onOpenHistoryItem,
-            onClearHistory = onClearHistory,
-            onDeleteHistoryItem = onDeleteHistoryItem,
-            modifier = modifier,
-        )
-
-        WorkbenchPanel.DEBUG -> DebugPanel(
-            debugState = state.debugState,
-            config = state.config,
-            sourceType = state.activeSourceType,
-            onClearDebugLogs = onClearDebugLogs,
-            onEvaluateJavaScript = onEvaluateJavaScript,
-            onReadCookies = onReadCookies,
-            onClearCookies = onClearCookies,
-            onClearWebViewCache = onClearWebViewCache,
-            modifier = modifier,
-        )
-    }
+    DebugPanel(
+        debugState = state.debugState,
+        config = state.config,
+        sourceType = state.activeSourceType,
+        onClearDebugLogs = onClearDebugLogs,
+        onClearDebug = onClearDebug,
+        onEvaluateJavaScript = onEvaluateJavaScript,
+        onReadCookies = onReadCookies,
+        onClearCookies = onClearCookies,
+        onClearWebViewCache = onClearWebViewCache,
+        selectedMode = selectedPanel.debugMode,
+        showModeTabs = false,
+        modifier = modifier,
+    )
 }
 
-private val WorkbenchPanel.labelRes: Int
-    @StringRes
+private val WorkbenchPanel.debugMode: DebugMode
     get() = when (this) {
-        WorkbenchPanel.CONFIG -> R.string.panel_config
-        WorkbenchPanel.DEBUG -> R.string.panel_debug
-        WorkbenchPanel.HISTORY -> R.string.panel_history
-    }
-
-private val WorkbenchPanel.icon: ImageVector
-    get() = when (this) {
-        WorkbenchPanel.CONFIG -> Icons.Outlined.Tune
-        WorkbenchPanel.DEBUG -> Icons.Outlined.BugReport
-        WorkbenchPanel.HISTORY -> Icons.Outlined.History
+        WorkbenchPanel.OVERVIEW -> DebugMode.Overview
+        WorkbenchPanel.TIMELINE -> DebugMode.Timeline
+        WorkbenchPanel.LOGS -> DebugMode.Logs
+        WorkbenchPanel.PAGE -> DebugMode.Page
+        WorkbenchPanel.STORAGE -> DebugMode.Storage
+        WorkbenchPanel.INSPECT -> DebugMode.Inspect
+        WorkbenchPanel.NETWORK -> DebugMode.Network
+        WorkbenchPanel.EXECUTE -> DebugMode.Execute
     }
 
 private fun Context.takePersistableReadPermissionIfAvailable(

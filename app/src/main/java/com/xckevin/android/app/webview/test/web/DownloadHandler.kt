@@ -12,6 +12,7 @@ class DownloadHandler(
     private val navigationTracker: WebViewNavigationTracker,
     private val onEvent: (WebPageEvent) -> Unit,
     private val onMessage: (String) -> Unit = {},
+    private val onUserFlow: (String, String) -> Unit = { _, _ -> },
 ) : DownloadListener {
     override fun onDownloadStart(
         url: String?,
@@ -63,6 +64,7 @@ class DownloadHandler(
 
             "data" -> {
                 onMessage("Inline data download logged but not saved in v1")
+                onUserFlow("Download logged", "Inline data download logged but not saved")
                 emitDownloadRequested(
                     url = url,
                     userAgent = userAgent,
@@ -77,6 +79,7 @@ class DownloadHandler(
 
             else -> {
                 onMessage("Download skipped: unsupported URL scheme")
+                onUserFlow("Download skipped", "Unsupported URL scheme: ${uri.scheme.orEmpty()}")
                 emitDownloadRequested(
                     url = url,
                     userAgent = userAgent,
@@ -140,10 +143,12 @@ class DownloadHandler(
             val downloadId = manager.enqueue(request)
             val message = "Download started: $fileName"
             onMessage(message)
+            onUserFlow(message, uri.toString())
             EnqueueResult(success = true, downloadId = downloadId, fileName = fileName, message = message)
         }.getOrElse { error ->
             val message = "Download failed: ${error.message.orEmpty()}"
             onMessage(message)
+            onUserFlow(message, uri.toString())
             EnqueueResult(success = false, downloadId = null, fileName = null, message = message)
         }
     }

@@ -76,6 +76,21 @@ class SettingsViewModelTest {
         assertEquals(WebTestConfig.default(), settingsRepository.current.defaultConfig)
     }
 
+    @Test fun changingDefaultConfigUpdatesSettingsStore() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = viewModel(settingsRepository = settingsRepository)
+        val updatedConfig = WebTestConfig.default().copy(
+            javaScriptEnabled = false,
+            domStorageEnabled = false,
+        )
+
+        viewModel.updateDefaultConfig(updatedConfig)
+        advanceUntilIdle()
+
+        assertEquals(updatedConfig, settingsRepository.current.defaultConfig)
+        assertEquals(updatedConfig, viewModel.state.value.defaultConfig)
+    }
+
     private fun viewModel(
         settingsRepository: FakeSettingsRepository = FakeSettingsRepository(),
         historyRepository: FakeHistoryRepository = FakeHistoryRepository(),

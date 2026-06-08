@@ -40,118 +40,124 @@ fun ConfigPanel(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            PanelSection(title = stringResource(R.string.config_section_runtime)) {
-                ToggleRow(
-                    label = stringResource(R.string.config_javascript),
-                    checked = config.javaScriptEnabled,
-                    onCheckedChange = { onConfigChanged(config.copy(javaScriptEnabled = it)) },
-                )
-                ToggleRow(
-                    label = stringResource(R.string.config_dom_storage),
-                    checked = config.domStorageEnabled,
-                    onCheckedChange = { onConfigChanged(config.copy(domStorageEnabled = it)) },
-                )
-                ToggleRow(
-                    label = stringResource(R.string.config_desktop_mode),
-                    checked = config.desktopMode,
-                    onCheckedChange = { onConfigChanged(config.copy(desktopMode = it)) },
-                )
-                ToggleRow(
-                    label = stringResource(R.string.config_cookies),
-                    checked = config.cookiesEnabled,
-                    onCheckedChange = { onConfigChanged(config.copy(cookiesEnabled = it)) },
-                )
-                ToggleRow(
-                    label = stringResource(R.string.config_third_party_cookies),
-                    checked = config.thirdPartyCookiesEnabled,
-                    onCheckedChange = { onConfigChanged(config.copy(thirdPartyCookiesEnabled = it)) },
-                )
-                ToggleRow(
-                    label = stringResource(R.string.config_webview_back_first),
-                    checked = config.webViewBackFirst,
-                    onCheckedChange = { onConfigChanged(config.copy(webViewBackFirst = it)) },
-                )
-                ToggleRow(
-                    label = stringResource(R.string.config_start_fullscreen),
-                    checked = config.startFullscreen,
-                    onCheckedChange = { onConfigChanged(config.copy(startFullscreen = it)) },
-                )
-            }
+        item { WebTestConfigSections(config = config, onConfigChanged = onConfigChanged) }
+    }
+}
+
+@Composable
+internal fun WebTestConfigSections(
+    config: WebTestConfig,
+    onConfigChanged: (WebTestConfig) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        PanelSection(title = stringResource(R.string.config_section_runtime)) {
+            ToggleRow(
+                label = stringResource(R.string.config_javascript),
+                checked = config.javaScriptEnabled,
+                onCheckedChange = { onConfigChanged(config.copy(javaScriptEnabled = it)) },
+            )
+            ToggleRow(
+                label = stringResource(R.string.config_dom_storage),
+                checked = config.domStorageEnabled,
+                onCheckedChange = { onConfigChanged(config.copy(domStorageEnabled = it)) },
+            )
+            ToggleRow(
+                label = stringResource(R.string.config_desktop_mode),
+                checked = config.desktopMode,
+                onCheckedChange = { onConfigChanged(config.copy(desktopMode = it)) },
+            )
+            ToggleRow(
+                label = stringResource(R.string.config_cookies),
+                checked = config.cookiesEnabled,
+                onCheckedChange = { onConfigChanged(config.copy(cookiesEnabled = it)) },
+            )
+            ToggleRow(
+                label = stringResource(R.string.config_third_party_cookies),
+                checked = config.thirdPartyCookiesEnabled,
+                onCheckedChange = { onConfigChanged(config.copy(thirdPartyCookiesEnabled = it)) },
+            )
+            ToggleRow(
+                label = stringResource(R.string.config_webview_back_first),
+                checked = config.webViewBackFirst,
+                onCheckedChange = { onConfigChanged(config.copy(webViewBackFirst = it)) },
+            )
+            ToggleRow(
+                label = stringResource(R.string.config_start_fullscreen),
+                checked = config.startFullscreen,
+                onCheckedChange = { onConfigChanged(config.copy(startFullscreen = it)) },
+            )
         }
 
-        item {
-            PanelSection(title = stringResource(R.string.config_section_user_agent)) {
-                EnumChipRow(
-                    label = stringResource(R.string.config_user_agent_mode),
-                    value = config.userAgentMode,
-                    values = UserAgentMode.entries,
-                    onValueChanged = { onConfigChanged(config.copy(userAgentMode = it)) },
-                )
-                OutlinedTextField(
-                    value = config.customUserAgent,
-                    onValueChange = { onConfigChanged(config.copy(customUserAgent = it)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    label = { Text(stringResource(R.string.config_custom_ua)) },
-                    singleLine = false,
-                    enabled = config.userAgentMode == UserAgentMode.CUSTOM,
-                    textStyle = MaterialTheme.typography.bodySmall,
-                )
-            }
+        PanelSection(title = stringResource(R.string.config_section_user_agent)) {
+            EnumChipRow(
+                label = stringResource(R.string.config_user_agent_mode),
+                value = config.userAgentMode,
+                values = UserAgentMode.entries,
+                onValueChanged = { onConfigChanged(config.copy(userAgentMode = it)) },
+            )
+            OutlinedTextField(
+                value = config.customUserAgent,
+                onValueChange = { onConfigChanged(config.copy(customUserAgent = it)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                label = { Text(stringResource(R.string.config_custom_ua)) },
+                singleLine = false,
+                enabled = config.userAgentMode == UserAgentMode.CUSTOM,
+                textStyle = MaterialTheme.typography.bodySmall,
+            )
         }
 
-        item {
-            PanelSection(title = stringResource(R.string.config_section_network_rendering)) {
-                EnumChipRow(
-                    label = stringResource(R.string.config_cache_mode),
-                    value = config.cacheMode,
-                    values = WebCacheMode.entries,
-                    onValueChanged = { onConfigChanged(config.copy(cacheMode = it)) },
-                )
-                EnumChipRow(
-                    label = stringResource(R.string.config_mixed_content),
-                    value = config.mixedContentMode,
-                    values = MixedContentMode.entries,
-                    onValueChanged = { onConfigChanged(config.copy(mixedContentMode = it)) },
-                )
-                EnumChipRow(
-                    label = stringResource(R.string.config_color_mode),
-                    value = config.colorMode,
-                    values = WebColorMode.entries,
-                    onValueChanged = { onConfigChanged(config.copy(colorMode = it)) },
-                )
-            }
+        PanelSection(title = stringResource(R.string.config_section_network_rendering)) {
+            EnumChipRow(
+                label = stringResource(R.string.config_cache_mode),
+                value = config.cacheMode,
+                values = WebCacheMode.entries,
+                onValueChanged = { onConfigChanged(config.copy(cacheMode = it)) },
+            )
+            EnumChipRow(
+                label = stringResource(R.string.config_mixed_content),
+                value = config.mixedContentMode,
+                values = MixedContentMode.entries,
+                onValueChanged = { onConfigChanged(config.copy(mixedContentMode = it)) },
+            )
+            EnumChipRow(
+                label = stringResource(R.string.config_color_mode),
+                value = config.colorMode,
+                values = WebColorMode.entries,
+                onValueChanged = { onConfigChanged(config.copy(colorMode = it)) },
+            )
         }
 
-        item {
-            PanelSection(title = stringResource(R.string.config_section_permissions)) {
-                EnumChipRow(
-                    label = stringResource(R.string.config_geolocation),
-                    value = config.geolocationPolicy,
-                    values = WebPermissionPolicy.entries,
-                    onValueChanged = { onConfigChanged(config.copy(geolocationPolicy = it)) },
-                )
-                EnumChipRow(
-                    label = stringResource(R.string.config_file_chooser),
-                    value = config.fileChooserPolicy,
-                    values = FeaturePolicy.entries,
-                    onValueChanged = { onConfigChanged(config.copy(fileChooserPolicy = it)) },
-                )
-                EnumChipRow(
-                    label = stringResource(R.string.config_camera),
-                    value = config.cameraPolicy,
-                    values = WebPermissionPolicy.entries,
-                    onValueChanged = { onConfigChanged(config.copy(cameraPolicy = it)) },
-                )
-                EnumChipRow(
-                    label = stringResource(R.string.config_microphone),
-                    value = config.microphonePolicy,
-                    values = WebPermissionPolicy.entries,
-                    onValueChanged = { onConfigChanged(config.copy(microphonePolicy = it)) },
-                )
-            }
+        PanelSection(title = stringResource(R.string.config_section_permissions)) {
+            EnumChipRow(
+                label = stringResource(R.string.config_geolocation),
+                value = config.geolocationPolicy,
+                values = WebPermissionPolicy.entries,
+                onValueChanged = { onConfigChanged(config.copy(geolocationPolicy = it)) },
+            )
+            EnumChipRow(
+                label = stringResource(R.string.config_file_chooser),
+                value = config.fileChooserPolicy,
+                values = FeaturePolicy.entries,
+                onValueChanged = { onConfigChanged(config.copy(fileChooserPolicy = it)) },
+            )
+            EnumChipRow(
+                label = stringResource(R.string.config_camera),
+                value = config.cameraPolicy,
+                values = WebPermissionPolicy.entries,
+                onValueChanged = { onConfigChanged(config.copy(cameraPolicy = it)) },
+            )
+            EnumChipRow(
+                label = stringResource(R.string.config_microphone),
+                value = config.microphonePolicy,
+                values = WebPermissionPolicy.entries,
+                onValueChanged = { onConfigChanged(config.copy(microphonePolicy = it)) },
+            )
         }
     }
 }

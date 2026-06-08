@@ -28,6 +28,8 @@ sealed interface WebPageEvent {
         val url: String?,
         val statusCode: Int,
         val reason: String,
+        val responseHeaders: Map<String, String> = emptyMap(),
+        val responseBody: String? = null,
         val navigationId: Long = 0L,
         val isMainFrame: Boolean = true,
     ) : WebPageEvent
@@ -38,6 +40,9 @@ sealed interface WebPageEvent {
     ) : WebPageEvent
     data class ResourceRequest(
         val url: String,
+        val method: String = "GET",
+        val requestHeaders: Map<String, String> = emptyMap(),
+        val requestBody: String? = null,
         val isMainFrame: Boolean,
         val navigationId: Long = 0L,
     ) : WebPageEvent
@@ -59,5 +64,12 @@ sealed interface WebPageEvent {
         val status: String,
         val reason: String?,
         val localUri: String?,
+    ) : WebPageEvent
+
+    data class UserFlow(
+        val kind: String,
+        val summary: String,
+        val detail: String = "",
+        val navigationId: Long = 0L,
     ) : WebPageEvent
 }

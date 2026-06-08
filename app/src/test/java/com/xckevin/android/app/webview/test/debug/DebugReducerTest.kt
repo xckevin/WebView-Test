@@ -76,6 +76,8 @@ class DebugReducerTest {
                 url = "https://example.com/app.js",
                 statusCode = 404,
                 reason = "Not Found",
+                responseHeaders = mapOf("Content-Type" to "application/javascript"),
+                responseBody = "not found",
                 isMainFrame = false,
                 timestamp = 350L,
             )
@@ -84,6 +86,8 @@ class DebugReducerTest {
         assertEquals(1, state.errors.size)
         assertEquals("HttpError", state.errors.single().type)
         assertFalse(state.errors.single().isMainFrame)
+        assertEquals("application/javascript", state.errors.single().responseHeaders["Content-Type"])
+        assertEquals("not found", state.errors.single().responseBody)
     }
 
     @Test fun resourceRequestStoresMainFrameCategory() {
@@ -91,6 +95,9 @@ class DebugReducerTest {
             DebugState(),
             DebugAction.ResourceRequest(
                 url = "https://example.com",
+                method = "GET",
+                requestHeaders = mapOf("User-Agent" to "Test UA"),
+                requestBody = "payload",
                 isMainFrame = true,
                 navigationId = 8L,
                 timestamp = 450L,
@@ -100,6 +107,11 @@ class DebugReducerTest {
         val request = state.requests.single()
         assertEquals(RequestCategory.MAIN_FRAME, request.category)
         assertEquals("main-frame", request.categoryLabel)
+        assertEquals("GET", request.method)
+        assertEquals("example.com", request.host)
+        assertEquals("https", request.scheme)
+        assertEquals("Test UA", request.requestHeaders["User-Agent"])
+        assertEquals("payload", request.requestBody)
     }
 
     @Test fun resourceRequestDetectsRedirectForSameMainFrameNavigation() {
@@ -107,6 +119,8 @@ class DebugReducerTest {
             DebugState(page = PageSnapshot(url = "https://first.example.com", navigationId = 8L)),
             DebugAction.ResourceRequest(
                 url = "https://second.example.com",
+                method = "GET",
+                requestHeaders = emptyMap(),
                 isMainFrame = true,
                 navigationId = 8L,
                 timestamp = 451L,
@@ -116,6 +130,84 @@ class DebugReducerTest {
         val request = state.requests.single()
         assertEquals(RequestCategory.REDIRECT, request.category)
         assertEquals("redirect", request.categoryLabel)
+    }
+
+    @Test fun timelineStoresEventsInOrderWithSeverity() {
+        val state = listOf<DebugAction>(
+            DebugAction.PageStarted(url = "https://example.com", navigationId = 2L, timestamp = 100L),
+            DebugAction.ConsoleEvent(
+                level = "ERROR",
+                message = "boom",
+                sourceId = "index.js",
+                lineNumber = 9,
+                navigationId = 2L,
+                timestamp = 110L,
+            ),
+            DebugAction.HttpError(
+                url = "https://example.com/api",
+                statusCode = 500,
+                reason = "Server Error",
+                isMainFrame = false,
+                navigationId = 2L,
+                timestamp = 120L,
+            ),
+        ).fold(DebugState()) { current, action -> DebugReducer.reduce(current, action) }
+
+        assertEquals(3, state.timeline.size)
+        assertEquals(DebugEventType.PAGE, state.timeline[0].type)
+        assertEquals(DebugSeverity.INFO, state.timeline[0].severity)
+        assertEquals(DebugEventType.CONSOLE, state.timeline[1].type)
+        assertEquals(DebugSeverity.ERROR, state.timeline[1].severity)
+        assertEquals(DebugEventType.ERROR, state.timeline[2].type)
+        assertEquals("HTTP 500: Server Error", state.timeline[2].summary)
+    }
+
+    @Test fun clearCurrentNavigationOnlyKeepsOtherNavigationEvents() {
+        val state = listOf<DebugAction>(
+            DebugAction.ConsoleEvent(level = "LOG", message = "old", navigationId = 1L, timestamp = 1L),
+            DebugAction.ConsoleEvent(level = "LOG", message = "current", navigationId = 2L, timestamp = 2L),
+            DebugAction.ResourceRequest(
+                url = "https://example.com/app.js",
+                method = "GET",
+                requestHeaders = emptyMap(),
+                isMainFrame = false,
+                navigationId = 2L,
+                timestamp = 3L,
+            ),
+        ).fold(DebugState()) { current, action -> DebugReducer.reduce(current, action) }
+
+        val cleared = DebugReducer.reduce(
+            state,
+            DebugAction.Clear(scope = DebugClearScope.CURRENT_NAVIGATION, navigationId = 2L, timestamp = 4L)
+        )
+
+        assertEquals(listOf("old"), cleared.consoleLogs.map { it.message })
+        assertTrue(cleared.requests.isEmpty())
+        assertEquals(listOf(1L), cleared.timeline.map { it.navigationId })
+    }
+
+    @Test fun permissionAndFileChooserActionsAreTracked() {
+        val state = listOf<DebugAction>(
+            DebugAction.UserFlowEvent(
+                kind = UserFlowKind.PERMISSION,
+                summary = "Web permission granted: camera",
+                detail = "policy=ASK_EVERY_TIME",
+                navigationId = 4L,
+                timestamp = 10L,
+            ),
+            DebugAction.UserFlowEvent(
+                kind = UserFlowKind.FILE_CHOOSER,
+                summary = "File chooser opened",
+                detail = "accept=image/png",
+                navigationId = 4L,
+                timestamp = 11L,
+            ),
+        ).fold(DebugState()) { current, action -> DebugReducer.reduce(current, action) }
+
+        assertEquals(2, state.userFlows.size)
+        assertEquals(UserFlowKind.PERMISSION, state.userFlows.first().kind)
+        assertEquals(DebugEventType.USER_FLOW, state.timeline.first().type)
+        assertEquals("File chooser opened", state.timeline.last().summary)
     }
 
     @Test fun downloadStatusUpdatesExistingDownloadById() {
@@ -189,7 +281,7 @@ class DebugReducerTest {
             ),
             page = page,
             requests = listOf(
-                RequestSnapshot(url = "https://example.com/app.js", isMainFrame = false, timestamp = 3L)
+                RequestSnapshot(url = "https://example.com/app.js", method = "GET", isMainFrame = false, timestamp = 3L)
             ),
             downloads = listOf(
                 DownloadSnapshot(url = "https://example.com/file.zip", timestamp = 4L)
@@ -207,5 +299,6 @@ class DebugReducerTest {
         assertTrue(cleared.requests.isEmpty())
         assertTrue(cleared.downloads.isEmpty())
         assertTrue(cleared.jsResults.isEmpty())
+        assertTrue(cleared.timeline.isEmpty())
     }
 }

@@ -9,7 +9,7 @@ data class WorkbenchState(
     val currentUrl: String? = null,
     val currentTitle: String = "",
     val config: WebTestConfig = WebTestConfig.default(),
-    val selectedPanel: WorkbenchPanel = WorkbenchPanel.CONFIG,
+    val selectedPanel: WorkbenchPanel = WorkbenchPanel.OVERVIEW,
     val isLoading: Boolean = false,
     val loadProgress: Int = 0,
     val requestedUrl: String? = null,
@@ -26,4 +26,13 @@ data class WorkbenchState(
     val debugState: DebugState = DebugState(),
 )
 
-enum class WorkbenchPanel { CONFIG, DEBUG, HISTORY }
+enum class WorkbenchPanel {
+    OVERVIEW,
+    TIMELINE,
+    LOGS,
+    PAGE,
+    STORAGE,
+    INSPECT,
+    NETWORK,
+    EXECUTE,
+}

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Cookie
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.AppContainer
+import com.xckevin.android.app.webview.test.ui.workbench.WebTestConfigSections
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,6 +146,13 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            SettingsSection(title = stringResource(R.string.panel_config), icon = Icons.Outlined.Tune) {
+                WebTestConfigSections(
+                    config = state.defaultConfig,
+                    onConfigChanged = viewModel::updateDefaultConfig,
+                )
+            }
+
             SettingsSection(title = stringResource(R.string.settings_webview_debugging), icon = Icons.Outlined.BugReport) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -231,6 +240,7 @@ private fun SettingsSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),

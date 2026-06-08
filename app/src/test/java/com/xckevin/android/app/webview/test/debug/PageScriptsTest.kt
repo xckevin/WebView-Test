@@ -35,6 +35,57 @@ class PageScriptsTest {
         assertTrue(script.contains("localStorage key removed: token"))
     }
 
+    @Test fun writeStorageKeyTargetsRequestedStorageAreaKeyAndValue() {
+        val script = PageScripts.writeStorageKey(
+            storageName = "sessionStorage",
+            key = "token",
+            value = """{"id":1}""",
+        )
+
+        assertTrue(script.contains("sessionStorage.setItem(\"token\", \"{\\\"id\\\":1}\")"))
+        assertTrue(script.contains("sessionStorage key saved: token"))
+    }
+
+    @Test fun readCookiesStructuredSplitsDocumentCookie() {
+        val script = PageScripts.readCookiesStructured()
+
+        assertTrue(script.contains("document.cookie"))
+        assertTrue(script.contains("name"))
+        assertTrue(script.contains("value"))
+    }
+
+    @Test fun writeCookieSetsDocumentCookie() {
+        val script = PageScripts.writeCookie(name = "sid", value = "abc")
+
+        assertTrue(script.contains("document.cookie"))
+        assertTrue(script.contains("\"sid\" + \"=\" + encodeURIComponent(\"abc\")"))
+        assertTrue(script.contains("cookie saved: sid"))
+    }
+
+    @Test fun deleteCookieExpiresDocumentCookie() {
+        val script = PageScripts.deleteCookie(name = "sid")
+
+        assertTrue(script.contains("document.cookie"))
+        assertTrue(script.contains("expires=Thu, 01 Jan 1970 00:00:00 GMT"))
+        assertTrue(script.contains("cookie deleted: sid"))
+    }
+
+    @Test fun readElementDetailsIncludesGeometryAndAttributes() {
+        val script = PageScripts.readElementDetails(selector = "button.primary")
+
+        assertTrue(script.contains("querySelectorAll(\"button.primary\")"))
+        assertTrue(script.contains("getBoundingClientRect"))
+        assertTrue(script.contains("attributes"))
+    }
+
+    @Test fun scriptTemplatesExposeCommonDiagnostics() {
+        val templates = PageScripts.templates()
+
+        assertTrue(templates.any { it.name == "Page info" && it.script.contains("location.href") })
+        assertTrue(templates.any { it.name == "List links" && it.script.contains("document.links") })
+        assertTrue(templates.any { it.name == "Viewport" && it.script.contains("innerWidth") })
+    }
+
     @Test fun executeUserScriptEscapesClosingScriptTag() {
         val script = PageScripts.executeUserScript("""return "</script>";""")
 

@@ -80,6 +80,7 @@ class TestWebViewClient(
                 url = request?.url?.toString(),
                 statusCode = errorResponse?.statusCode ?: 0,
                 reason = errorResponse?.reasonPhrase.orEmpty(),
+                responseHeaders = errorResponse?.responseHeaders.orEmpty(),
                 navigationId = navigationId,
                 isMainFrame = request?.isForMainFrame == true,
             )
@@ -109,6 +110,8 @@ class TestWebViewClient(
                 view,
                 WebPageEvent.ResourceRequest(
                     url = url,
+                    method = request?.method ?: "GET",
+                    requestHeaders = request?.requestHeaders.orEmpty(),
                     isMainFrame = request.isForMainFrame,
                     navigationId = navigationTracker.activeNavigationId(),
                 )

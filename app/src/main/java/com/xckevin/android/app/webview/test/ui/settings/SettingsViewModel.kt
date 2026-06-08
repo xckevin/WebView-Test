@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 
 data class SettingsState(
     val webContentsDebuggingEnabled: Boolean = false,
+    val defaultConfig: WebTestConfig = WebTestConfig.default(),
     val statusMessage: String? = null,
 )
 
@@ -27,7 +28,10 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _state.update {
-                    it.copy(webContentsDebuggingEnabled = settings.webContentsDebuggingEnabled)
+                    it.copy(
+                        webContentsDebuggingEnabled = settings.webContentsDebuggingEnabled,
+                        defaultConfig = settings.defaultConfig,
+                    )
                 }
             }
         }
@@ -53,6 +57,12 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.setDefaultConfig(WebTestConfig.default())
             _state.update { it.copy(statusMessage = "Default WebView config restored") }
+        }
+    }
+
+    fun updateDefaultConfig(config: WebTestConfig) {
+        viewModelScope.launch {
+            settingsRepository.setDefaultConfig(config)
         }
     }
 
