@@ -86,6 +86,90 @@ class DebugReducerTest {
         assertFalse(state.errors.single().isMainFrame)
     }
 
+    @Test fun resourceRequestStoresMainFrameCategory() {
+        val state = DebugReducer.reduce(
+            DebugState(),
+            DebugAction.ResourceRequest(
+                url = "https://example.com",
+                isMainFrame = true,
+                navigationId = 8L,
+                timestamp = 450L,
+            )
+        )
+
+        val request = state.requests.single()
+        assertEquals(RequestCategory.MAIN_FRAME, request.category)
+        assertEquals("main-frame", request.categoryLabel)
+    }
+
+    @Test fun resourceRequestDetectsRedirectForSameMainFrameNavigation() {
+        val state = DebugReducer.reduce(
+            DebugState(page = PageSnapshot(url = "https://first.example.com", navigationId = 8L)),
+            DebugAction.ResourceRequest(
+                url = "https://second.example.com",
+                isMainFrame = true,
+                navigationId = 8L,
+                timestamp = 451L,
+            )
+        )
+
+        val request = state.requests.single()
+        assertEquals(RequestCategory.REDIRECT, request.category)
+        assertEquals("redirect", request.categoryLabel)
+    }
+
+    @Test fun downloadStatusUpdatesExistingDownloadById() {
+        val requested = DebugReducer.reduce(
+            DebugState(),
+            DebugAction.DownloadRequested(
+                url = "https://example.com/file.zip",
+                userAgent = "ua",
+                contentDisposition = null,
+                mimeType = "application/zip",
+                contentLength = 10L,
+                navigationId = 9L,
+                downloadId = 42L,
+                fileName = "file.zip",
+                status = DownloadStatus.QUEUED,
+                timestamp = 500L,
+            )
+        )
+
+        val updated = DebugReducer.reduce(
+            requested,
+            DebugAction.DownloadStatusChanged(
+                downloadId = 42L,
+                status = DownloadStatus.SUCCESS,
+                reason = "Saved",
+                localUri = "file:///sdcard/Download/file.zip",
+                timestamp = 600L,
+            )
+        )
+
+        val download = updated.downloads.single()
+        assertEquals(DownloadStatus.SUCCESS, download.status)
+        assertEquals("Saved", download.reason)
+        assertEquals("file:///sdcard/Download/file.zip", download.localUri)
+        assertEquals(600L, download.updatedAt)
+    }
+
+    @Test fun unmatchedDownloadStatusAddsDiagnosticLog() {
+        val state = DebugReducer.reduce(
+            DebugState(),
+            DebugAction.DownloadStatusChanged(
+                downloadId = 99L,
+                status = DownloadStatus.FAILED,
+                reason = "Unknown id",
+                localUri = null,
+                timestamp = 700L,
+            )
+        )
+
+        val log = state.consoleLogs.single()
+        assertEquals("WARN", log.level)
+        assertEquals("Download 99 finished without a matching request: FAILED", log.message)
+    }
+
 
     @Test fun clearLogsKeepsCurrentPageState() {
         val page = PageSnapshot(

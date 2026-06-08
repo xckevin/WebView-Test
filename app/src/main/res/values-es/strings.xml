@@ -21,6 +21,8 @@
     <string name="action_paste">Pegar</string>
     <string name="action_scan">Escanear</string>
     <string name="action_open_local_html">Abrir HTML local</string>
+    <string name="action_open_permission_fixture">Abrir prueba de permisos</string>
+    <string name="action_open_local_fixture">Abrir prueba local de depuración</string>
     <string name="action_refresh">Actualizar</string>
     <string name="action_fullscreen">Pantalla completa</string>
     <string name="action_exit_fullscreen">Salir de pantalla completa</string>

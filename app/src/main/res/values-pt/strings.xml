@@ -21,6 +21,8 @@
     <string name="action_paste">Colar</string>
     <string name="action_scan">Escanear</string>
     <string name="action_open_local_html">Abrir HTML local</string>
+    <string name="action_open_permission_fixture">Abrir teste de permissões</string>
+    <string name="action_open_local_fixture">Abrir teste local de depuração</string>
     <string name="action_refresh">Atualizar</string>
     <string name="action_fullscreen">Tela cheia</string>
     <string name="action_exit_fullscreen">Sair da tela cheia</string>

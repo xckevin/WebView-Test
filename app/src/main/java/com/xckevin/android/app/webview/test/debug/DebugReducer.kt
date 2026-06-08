@@ -136,6 +136,7 @@ object DebugReducer {
                     RequestSnapshot(
                         url = action.url,
                         isMainFrame = action.isMainFrame,
+                        category = action.toRequestCategory(state.page),
                         navigationId = action.navigationId,
                         timestamp = action.timestamp,
                     )
@@ -150,11 +151,46 @@ object DebugReducer {
                         contentDisposition = action.contentDisposition,
                         mimeType = action.mimeType,
                         contentLength = action.contentLength,
+                        downloadId = action.downloadId,
+                        fileName = action.fileName,
+                        status = action.status,
+                        reason = action.reason,
                         navigationId = action.navigationId,
                         timestamp = action.timestamp,
                     )
                 )
             )
+
+            is DebugAction.DownloadStatusChanged -> {
+                val downloadIndex = state.downloads.indexOfLast { it.downloadId == action.downloadId }
+                if (downloadIndex < 0) {
+                    state.copy(
+                        consoleLogs = state.consoleLogs.appendCapped(
+                            ConsoleLog(
+                                level = "WARN",
+                                message = "Download ${action.downloadId} finished without a matching request: ${action.status}",
+                                sourceId = "download-manager",
+                                timestamp = action.timestamp,
+                            )
+                        )
+                    )
+                } else {
+                    state.copy(
+                        downloads = state.downloads.mapIndexed { index, download ->
+                            if (index != downloadIndex) {
+                                download
+                            } else {
+                                download.copy(
+                                    status = action.status,
+                                    reason = action.reason,
+                                    localUri = action.localUri,
+                                    updatedAt = action.timestamp,
+                                )
+                            }
+                        }
+                    )
+                }
+            }
 
             is DebugAction.JavaScriptResult -> state.copy(
                 jsResults = state.jsResults.appendCapped(
@@ -171,6 +207,14 @@ object DebugReducer {
 
     private fun <T> List<T>.appendCapped(value: T): List<T> =
         (this + value).takeLast(MaxEntries)
+
+    private fun DebugAction.ResourceRequest.toRequestCategory(page: PageSnapshot): RequestCategory {
+        if (!isMainFrame) return RequestCategory.RESOURCE
+        if (navigationId == page.navigationId && page.url != null && url != page.url) {
+            return RequestCategory.REDIRECT
+        }
+        return RequestCategory.MAIN_FRAME
+    }
 }
 
 sealed interface DebugAction {
@@ -250,6 +294,18 @@ sealed interface DebugAction {
         val mimeType: String?,
         val contentLength: Long,
         val navigationId: Long = 0L,
+        val downloadId: Long? = null,
+        val fileName: String? = null,
+        val status: DownloadStatus = DownloadStatus.REQUESTED,
+        val reason: String? = null,
+        val timestamp: Long = 0L,
+    ) : DebugAction
+
+    data class DownloadStatusChanged(
+        val downloadId: Long,
+        val status: DownloadStatus,
+        val reason: String?,
+        val localUri: String?,
         val timestamp: Long = 0L,
     ) : DebugAction
 

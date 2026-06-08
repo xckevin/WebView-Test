@@ -21,6 +21,8 @@
     <string name="action_paste">Paste</string>
     <string name="action_scan">Scan</string>
     <string name="action_open_local_html">Open local HTML</string>
+    <string name="action_open_permission_fixture">Open permission fixture</string>
+    <string name="action_open_local_fixture">Open local debug fixture</string>
     <string name="action_refresh">Refresh</string>
     <string name="action_fullscreen">Fullscreen</string>
     <string name="action_exit_fullscreen">Exit fullscreen</string>

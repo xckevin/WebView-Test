@@ -21,6 +21,8 @@
     <string name="action_paste">Einfügen</string>
     <string name="action_scan">Scannen</string>
     <string name="action_open_local_html">Lokales HTML öffnen</string>
+    <string name="action_open_permission_fixture">Berechtigungs-Fixture öffnen</string>
+    <string name="action_open_local_fixture">Lokale Debug-Fixture öffnen</string>
     <string name="action_refresh">Aktualisieren</string>
     <string name="action_fullscreen">Vollbild</string>
     <string name="action_exit_fullscreen">Vollbild beenden</string>

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.MoreVert
@@ -58,6 +59,8 @@ fun UrlBar(
     onLoad: () -> Unit,
     onScan: () -> Unit,
     onOpenLocalHtml: () -> Unit = {},
+    onOpenPermissionFixture: () -> Unit = {},
+    onOpenLocalFixture: () -> Unit = {},
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleFullscreen: () -> Unit,
@@ -70,6 +73,8 @@ fun UrlBar(
     val pasteDescription = stringResource(R.string.action_paste)
     val scanDescription = stringResource(R.string.action_scan)
     val openLocalHtmlDescription = stringResource(R.string.action_open_local_html)
+    val permissionFixtureDescription = stringResource(R.string.action_open_permission_fixture)
+    val localFixtureDescription = stringResource(R.string.action_open_local_fixture)
     val refreshDescription = stringResource(R.string.action_refresh)
     val settingsDescription = stringResource(R.string.screen_settings)
     val fullscreenDescription = stringResource(
@@ -183,6 +188,26 @@ fun UrlBar(
                         },
                         leadingIcon = {
                             Icon(Icons.Outlined.FolderOpen, contentDescription = null)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(permissionFixtureDescription) },
+                        onClick = {
+                            isOverflowOpen = false
+                            onOpenPermissionFixture()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Science, contentDescription = null)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(localFixtureDescription) },
+                        onClick = {
+                            isOverflowOpen = false
+                            onOpenLocalFixture()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Science, contentDescription = null)
                         },
                     )
 //                    DropdownMenuItem(

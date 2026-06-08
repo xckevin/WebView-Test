@@ -451,3 +451,27 @@ Workbench 已完成响应式布局：
 v1 的核心能力已经完成：它可以作为一个单会话 Android WebView/H5 测试工作台使用，支持 URL/扫码/本地 HTML 加载、历史、测试用例、配置切换、设备侧基础调试、release WebView debugging 开关，以及 Android WebView 高级行为测试。
 
 当前剩余工作主要集中在“更像完整 DevTools”“更深 Network/Elements 能力”“更完整 fixture 和自动化验收”“团队协作与多会话”这些增强方向。
+
+## 2026-06-08 P0/P1 完成记录
+
+已继续完成路线图中的 P0 + P1 能力：
+
+- 新增内置权限 fixture：`file:///android_asset/fixtures/permission_fixture.html`，覆盖 camera、microphone、camera+microphone、geolocation 请求。
+- 新增内置本地调试 fixture：`file:///android_asset/fixtures/local_debug_fixture.html`，覆盖 console、storage、cookie、elements、source、data URL download。
+- Workbench URL overflow 菜单新增两个 fixture 入口，可直接加载上述内置页面。
+- Debug Panel 的 Page tab 新增当前环境摘要：source type、JavaScript、DOM storage、desktop mode、UA mode、cache/mixed content、cookie 与权限策略。
+- DownloadManager 下载请求现在记录 download id、文件名、初始状态，并在系统下载完成广播后查询终态，回写 success/failed/unknown、reason、local URI。
+- Requests 记录新增分类：`main-frame`、`resource`、`redirect`。
+- Source/Elements/Storage/Cookies 结果展示改为结构化格式化输出，减少原始 JSON/string 直出。
+- Elements 摘要支持 CSS selector 和 tag/id/class/text 搜索过滤。
+- Storage 支持按单 key 删除 localStorage 或 sessionStorage。
+- Cookies 读取按当前 URL 返回，并在面板中按 key/value 结构化展示。
+- 新增 release WebView debugging 验收说明：`docs/release-webview-debugging-acceptance.md`。
+
+新增/更新测试覆盖：
+
+- `DebugReducerTest`
+- `PageScriptsTest`
+- `DebugResultFormatterTest`
+- `WorkbenchViewModelTest`
+- `StringResourceParityTest`

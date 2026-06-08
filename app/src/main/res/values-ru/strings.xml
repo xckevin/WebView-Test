@@ -21,6 +21,8 @@
     <string name="action_paste">Вставить</string>
     <string name="action_scan">Сканировать</string>
     <string name="action_open_local_html">Открыть локальный HTML</string>
+    <string name="action_open_permission_fixture">Открыть страницу проверки разрешений</string>
+    <string name="action_open_local_fixture">Открыть локальную страницу отладки</string>
     <string name="action_refresh">Обновить</string>
     <string name="action_fullscreen">Полный экран</string>
     <string name="action_exit_fullscreen">Выйти из полноэкранного режима</string>

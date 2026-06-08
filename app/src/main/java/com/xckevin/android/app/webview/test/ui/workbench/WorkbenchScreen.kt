@@ -1,8 +1,11 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.ClipData
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.annotation.StringRes
@@ -171,9 +174,10 @@ fun WorkbenchScreen(
             callback(result)
         }
     }
-    val readCookies: () -> Unit = {
+    val readCookies: ((String) -> Unit) -> Unit = { callback ->
         val cookies = webViewController.readCookies()
         viewModel.recordJavaScriptResult(script = "document.cookie", result = cookies)
+        callback(cookies)
     }
     val clearCookies: () -> Unit = {
         webViewController.clearCookies { removed ->
@@ -186,6 +190,12 @@ fun WorkbenchScreen(
     }
     val openLocalHtml: () -> Unit = {
         localHtmlLauncher.launch(arrayOf("text/html", "text/*", "application/xhtml+xml"))
+    }
+    val openPermissionFixture: () -> Unit = {
+        viewModel.loadLocalFile("file:///android_asset/fixtures/permission_fixture.html")
+    }
+    val openLocalFixture: () -> Unit = {
+        viewModel.loadLocalFile("file:///android_asset/fixtures/local_debug_fixture.html")
     }
 
     BackHandler(enabled = state.isVideoFullscreen || state.isFullscreen || state.canGoBack) {
@@ -208,6 +218,27 @@ fun WorkbenchScreen(
             pendingRuntimePermissionAlreadyGranted = emptyMap()
             permissionPrompt?.onDeny()
             permissionPrompt = null
+        }
+    }
+
+    DisposableEffect(context, viewModel) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                if (intent.action != DownloadManager.ACTION_DOWNLOAD_COMPLETE) return
+                val downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                if (downloadId <= 0L) return
+
+                viewModel.onWebPageEvent(receiverContext.downloadStatusChangedEvent(downloadId))
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
         }
     }
 
@@ -235,6 +266,8 @@ fun WorkbenchScreen(
                         onLoad = viewModel::loadUrl,
                         onScan = onOpenScanner,
                         onOpenLocalHtml = openLocalHtml,
+                        onOpenPermissionFixture = openPermissionFixture,
+                        onOpenLocalFixture = openLocalFixture,
                         onRefresh = viewModel::refresh,
                         onOpenSettings = onOpenSettings,
                         onToggleFullscreen = viewModel::toggleFullscreen,
@@ -342,7 +375,7 @@ internal fun WorkbenchFrame(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
-    onReadCookies: () -> Unit,
+    onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
@@ -492,7 +525,7 @@ private fun WorkbenchDrawer(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
-    onReadCookies: () -> Unit,
+    onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
@@ -678,6 +711,8 @@ private fun BrowserColumn(
     onLoad: () -> Unit,
     onScan: () -> Unit,
     onOpenLocalHtml: () -> Unit,
+    onOpenPermissionFixture: () -> Unit,
+    onOpenLocalFixture: () -> Unit,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleFullscreen: () -> Unit,
@@ -734,6 +769,8 @@ private fun BrowserColumn(
                     onLoad = onLoad,
                     onScan = onScan,
                     onOpenLocalHtml = onOpenLocalHtml,
+                    onOpenPermissionFixture = onOpenPermissionFixture,
+                    onOpenLocalFixture = onOpenLocalFixture,
                     onRefresh = onRefresh,
                     onOpenSettings = onOpenSettings,
                     onToggleFullscreen = onToggleFullscreen,
@@ -754,7 +791,7 @@ private fun WorkbenchPanelSurface(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
-    onReadCookies: () -> Unit,
+    onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
@@ -835,7 +872,7 @@ private fun PanelContent(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
-    onReadCookies: () -> Unit,
+    onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
@@ -857,6 +894,8 @@ private fun PanelContent(
 
         WorkbenchPanel.DEBUG -> DebugPanel(
             debugState = state.debugState,
+            config = state.config,
+            sourceType = state.activeSourceType,
             onClearDebugLogs = onClearDebugLogs,
             onEvaluateJavaScript = onEvaluateJavaScript,
             onReadCookies = onReadCookies,
@@ -894,6 +933,59 @@ private fun Context.takePersistableReadPermissionIfAvailable(
         }
     }
 }
+
+private fun Context.downloadStatusChangedEvent(downloadId: Long): WebPageEvent.DownloadStatusChanged {
+    val manager = getSystemService(DownloadManager::class.java)
+    return runCatching {
+        manager.query(DownloadManager.Query().setFilterById(downloadId)).use { cursor ->
+            if (!cursor.moveToFirst()) {
+                return@use WebPageEvent.DownloadStatusChanged(
+                    downloadId = downloadId,
+                    status = "UNKNOWN",
+                    reason = "DownloadManager row not found",
+                    localUri = null,
+                )
+            }
+            val status = cursor.getIntColumn(DownloadManager.COLUMN_STATUS).toDownloadStatusName()
+            val reason = cursor.getIntColumn(DownloadManager.COLUMN_REASON).takeIf { it > 0 }?.let {
+                "DownloadManager reason: $it"
+            }
+            WebPageEvent.DownloadStatusChanged(
+                downloadId = downloadId,
+                status = status,
+                reason = reason,
+                localUri = cursor.getStringColumn(DownloadManager.COLUMN_LOCAL_URI),
+            )
+        }
+    }.getOrElse { error ->
+        WebPageEvent.DownloadStatusChanged(
+            downloadId = downloadId,
+            status = "UNKNOWN",
+            reason = "DownloadManager query failed: ${error.message.orEmpty()}",
+            localUri = null,
+        )
+    }
+}
+
+private fun android.database.Cursor.getIntColumn(name: String): Int {
+    val index = getColumnIndex(name)
+    return if (index >= 0) getInt(index) else 0
+}
+
+private fun android.database.Cursor.getStringColumn(name: String): String? {
+    val index = getColumnIndex(name)
+    return if (index >= 0) getString(index) else null
+}
+
+private fun Int.toDownloadStatusName(): String =
+    when (this) {
+        DownloadManager.STATUS_SUCCESSFUL -> "SUCCESS"
+        DownloadManager.STATUS_FAILED -> "FAILED"
+        DownloadManager.STATUS_PENDING,
+        DownloadManager.STATUS_PAUSED,
+        DownloadManager.STATUS_RUNNING -> "QUEUED"
+        else -> "UNKNOWN"
+    }
 
 private fun WorkbenchViewModel.openContextMenuTarget(url: String) {
     when (Uri.parse(url).scheme?.lowercase()) {

@@ -6,6 +6,7 @@ import com.xckevin.android.app.webview.test.data.HistoryRepository
 import com.xckevin.android.app.webview.test.debug.DebugAction
 import com.xckevin.android.app.webview.test.debug.DebugReducer
 import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.debug.DownloadStatus
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
 import com.xckevin.android.app.webview.test.model.WebTestConfig
@@ -349,6 +350,25 @@ class WorkbenchViewModel(
                                 mimeType = event.mimeType,
                                 contentLength = event.contentLength,
                                 navigationId = event.navigationId,
+                                downloadId = event.downloadId,
+                                fileName = event.fileName,
+                                status = event.status.toDownloadStatus(),
+                                reason = event.reason,
+                            )
+                        )
+                    )
+                }
+            }
+
+            is WebPageEvent.DownloadStatusChanged -> {
+                _state.update {
+                    it.copy(
+                        debugState = it.debugState.reduceDebug(
+                            DebugAction.DownloadStatusChanged(
+                                downloadId = event.downloadId,
+                                status = event.status.toDownloadStatus(),
+                                reason = event.reason,
+                                localUri = event.localUri,
                             )
                         )
                     )
@@ -406,6 +426,7 @@ class WorkbenchViewModel(
             is DebugAction.SslError -> action.copy(timestamp = clock())
             is DebugAction.ResourceRequest -> action.copy(timestamp = clock())
             is DebugAction.DownloadRequested -> action.copy(timestamp = clock())
+            is DebugAction.DownloadStatusChanged -> action.copy(timestamp = clock())
             is DebugAction.JavaScriptResult -> action.copy(timestamp = clock())
         }
         return DebugReducer.reduce(this, timestampedAction)
@@ -425,4 +446,8 @@ class WorkbenchViewModel(
             this == currentState.activeNavigationId &&
             !currentState.activeNavigationCompleted
     }
+
+    private fun String.toDownloadStatus(): DownloadStatus =
+        runCatching { DownloadStatus.valueOf(uppercase()) }
+            .getOrDefault(DownloadStatus.UNKNOWN)
 }

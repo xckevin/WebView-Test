@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Debug Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 24px; line-height: 1.45; }
+    button, input { margin: 8px 0; padding: 10px 14px; }
+    section { border-top: 1px solid #d6dae2; margin-top: 18px; padding-top: 18px; }
+    img { max-width: 120px; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Local Debug Fixture</h1>
+  <section id="storage" class="fixture storage">
+    <h2>Storage</h2>
+    <button id="write-storage" class="primary">Write storage</button>
+    <button id="clear-storage">Clear storage</button>
+    <input id="sample-input" name="sample" value="fixture input">
+  </section>
+  <section id="elements" class="fixture elements">
+    <h2>Elements</h2>
+    <a id="sample-link" class="nav link" href="#storage">Storage anchor</a>
+    <button id="submit-button" class="primary cta" type="button">Submit fixture</button>
+    <form id="sample-form"><input name="email" type="email" value="debug@example.com"></form>
+    <img id="inline-image" alt="inline svg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80'%3E%3Crect width='120' height='80' fill='%230078d4'/%3E%3Ctext x='12' y='45' fill='white'%3Efixture%3C/text%3E%3C/svg%3E">
+  </section>
+  <section id="downloads" class="fixture downloads">
+    <h2>Downloads</h2>
+    <a id="data-download" download="fixture.txt" href="data:text/plain;charset=utf-8,hello%20from%20webview%20fixture">Data URL download</a>
+  </section>
+  <script>
+    console.log("local debug fixture loaded");
+    console.warn("sample warning from fixture");
+    document.cookie = "fixture_cookie=enabled; path=/";
+    document.querySelector("#write-storage").addEventListener("click", () => {
+      localStorage.setItem("fixtureLocal", "local value");
+      sessionStorage.setItem("fixtureSession", "session value");
+      console.log("storage written");
+    });
+    document.querySelector("#clear-storage").addEventListener("click", () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      console.log("storage cleared");
+    });
+    document.querySelector("#submit-button").addEventListener("click", () => {
+      console.error("sample error from fixture button");
+    });
+  </script>
+</body>
+</html>

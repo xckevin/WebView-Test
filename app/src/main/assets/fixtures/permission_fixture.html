@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Permission Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 24px; line-height: 1.45; }
+    button { display: block; margin: 10px 0; padding: 10px 14px; }
+    pre { background: #f2f4f8; padding: 12px; white-space: pre-wrap; }
+    video { width: 100%; max-width: 360px; background: #111; }
+  </style>
+</head>
+<body>
+  <h1>Web Permission Fixture</h1>
+  <button id="camera" class="permission camera">Request camera</button>
+  <button id="microphone" class="permission microphone">Request microphone</button>
+  <button id="camera-microphone" class="permission combo">Request camera + microphone</button>
+  <button id="geolocation" class="permission location">Request geolocation</button>
+  <video id="preview" autoplay playsinline muted></video>
+  <pre id="log">Ready</pre>
+
+  <script>
+    const log = document.querySelector("#log");
+    const preview = document.querySelector("#preview");
+    function append(message) {
+      log.textContent += "\n" + new Date().toISOString() + " " + message;
+      console.log(message);
+    }
+    async function requestMedia(constraints) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        preview.srcObject = stream;
+        append("media granted: " + JSON.stringify(constraints));
+      } catch (error) {
+        append("media denied: " + error.name + " " + error.message);
+      }
+    }
+    document.querySelector("#camera").addEventListener("click", () => requestMedia({ video: true }));
+    document.querySelector("#microphone").addEventListener("click", () => requestMedia({ audio: true }));
+    document.querySelector("#camera-microphone").addEventListener("click", () => requestMedia({ video: true, audio: true }));
+    document.querySelector("#geolocation").addEventListener("click", () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => append("geolocation granted: " + position.coords.latitude + "," + position.coords.longitude),
+        (error) => append("geolocation denied: " + error.code + " " + error.message),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  </script>
+</body>
+</html>

@@ -148,9 +148,11 @@ class WorkbenchScreenTest {
                 ) {
                     DebugPanel(
                         debugState = DebugState(),
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
                         onClearDebugLogs = {},
                         onEvaluateJavaScript = { _, callback -> callback("") },
-                        onReadCookies = {},
+                        onReadCookies = { callback -> callback("") },
                         onClearCookies = {},
                         onClearWebViewCache = {},
                         modifier = Modifier.fillMaxSize(),

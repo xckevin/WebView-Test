@@ -49,10 +49,13 @@ import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.debug.ConsoleLog
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.debug.DownloadSnapshot
+import com.xckevin.android.app.webview.test.debug.DebugResultFormatter
 import com.xckevin.android.app.webview.test.debug.JsExecutionResult
 import com.xckevin.android.app.webview.test.debug.PageError
 import com.xckevin.android.app.webview.test.debug.PageScripts
 import com.xckevin.android.app.webview.test.debug.RequestSnapshot
+import com.xckevin.android.app.webview.test.model.SourceType
+import com.xckevin.android.app.webview.test.model.WebTestConfig
 import com.xckevin.android.app.webview.test.ui.theme.Red500
 import java.text.DateFormat
 import java.util.Date
@@ -60,9 +63,11 @@ import java.util.Date
 @Composable
 fun DebugPanel(
     debugState: DebugState,
+    config: WebTestConfig,
+    sourceType: SourceType,
     onClearDebugLogs: () -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
-    onReadCookies: () -> Unit,
+    onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
@@ -117,6 +122,8 @@ fun DebugPanel(
 
             DebugMode.Page -> PageTab(
                 debugState = debugState,
+                config = config,
+                sourceType = sourceType,
                 onClearWebViewCache = onClearWebViewCache,
                 modifier = Modifier.weight(1f),
             )
@@ -236,6 +243,8 @@ private fun LogsTab(
 @Composable
 private fun PageTab(
     debugState: DebugState,
+    config: WebTestConfig,
+    sourceType: SourceType,
     onClearWebViewCache: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -267,18 +276,40 @@ private fun PageTab(
                 ),
             )
         }
+        item {
+            SectionLabel(text = "Environment")
+        }
+        item {
+            DebugItem(
+                title = "Current WebView environment",
+                subtitle = "",
+                details = listOf(
+                    "Source type: $sourceType",
+                    "JavaScript: ${config.javaScriptEnabled}",
+                    "DOM storage: ${config.domStorageEnabled}",
+                    "Desktop mode: ${config.desktopMode}",
+                    "User agent mode: ${config.userAgentMode}",
+                    "Cache mode: ${config.cacheMode}",
+                    "Mixed content: ${config.mixedContentMode}",
+                    "Cookies: ${config.cookiesEnabled}",
+                    "Third-party cookies: ${config.thirdPartyCookiesEnabled}",
+                    "Permissions: camera=${config.cameraPolicy}, microphone=${config.microphonePolicy}, geolocation=${config.geolocationPolicy}",
+                ),
+            )
+        }
     }
 }
 
 @Composable
 private fun StorageTab(
-    onReadCookies: () -> Unit,
+    onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onResult: (String) -> Unit,
     results: List<String>,
     modifier: Modifier = Modifier,
 ) {
+    var storageKey by remember { mutableStateOf("") }
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(12.dp),
@@ -292,7 +323,7 @@ private fun StorageTab(
         }
         item {
             ButtonRow {
-                FilledTonalButton(onClick = onReadCookies) {
+                FilledTonalButton(onClick = { onReadCookies(onResult) }) {
                     Text(stringResource(R.string.debug_read_cookies))
                 }
                 OutlinedButton(onClick = onClearCookies) {
@@ -323,6 +354,32 @@ private fun StorageTab(
                 }
             }
         }
+        item {
+            OutlinedTextField(
+                value = storageKey,
+                onValueChange = { storageKey = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Storage key") },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+            )
+        }
+        item {
+            ButtonRow {
+                OutlinedButton(
+                    enabled = storageKey.isNotBlank(),
+                    onClick = { onEvaluateJavaScript(PageScripts.deleteStorageKey("localStorage", storageKey), onResult) },
+                ) {
+                    Text("Delete local key")
+                }
+                OutlinedButton(
+                    enabled = storageKey.isNotBlank(),
+                    onClick = { onEvaluateJavaScript(PageScripts.deleteStorageKey("sessionStorage", storageKey), onResult) },
+                ) {
+                    Text("Delete session key")
+                }
+            }
+        }
         resultItems(results)
     }
 }
@@ -334,6 +391,8 @@ private fun InspectTab(
     results: List<String>,
     modifier: Modifier = Modifier,
 ) {
+    var elementSearch by remember { mutableStateOf("") }
+    var elementSelector by remember { mutableStateOf("") }
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(12.dp),
@@ -347,10 +406,37 @@ private fun InspectTab(
                 FilledTonalButton(onClick = { onEvaluateJavaScript(PageScripts.readSource(), onResult) }) {
                     Text(stringResource(R.string.debug_read_source))
                 }
-                OutlinedButton(onClick = { onEvaluateJavaScript(PageScripts.readElementsSummary(), onResult) }) {
+                OutlinedButton(
+                    onClick = {
+                        onEvaluateJavaScript(
+                            PageScripts.readElementsSummary(search = elementSearch, selector = elementSelector),
+                            onResult,
+                        )
+                    },
+                ) {
                     Text(stringResource(R.string.debug_read_elements))
                 }
             }
+        }
+        item {
+            OutlinedTextField(
+                value = elementSelector,
+                onValueChange = { elementSelector = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("CSS selector") },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = elementSearch,
+                onValueChange = { elementSearch = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Search tag/id/class/text") },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+            )
         }
         resultItems(results)
     }
@@ -406,7 +492,8 @@ private fun JsExecTab(
                     title = if (result.isError) stringResource(R.string.debug_error) else stringResource(R.string.debug_result),
                     subtitle = formatTime(result.timestamp),
                     accentColor = if (result.isError) Red500 else null,
-                    details = listOf(result.result, stringResource(R.string.debug_script_label, result.script)),
+                    details = DebugResultFormatter.formatScriptResult(result.result) +
+                        stringResource(R.string.debug_script_label, result.script),
                 )
             }
         }
@@ -453,6 +540,7 @@ private fun NetworkTab(
                         title = request.url,
                         subtitle = formatTime(request.timestamp),
                         details = listOf(
+                            "Category: ${request.categoryLabel}",
                             stringResource(R.string.debug_main_frame_label, request.isMainFrame),
                             stringResource(R.string.debug_navigation_label, request.navigationId),
                         ),
@@ -469,6 +557,11 @@ private fun NetworkTab(
                         title = download.url,
                         subtitle = formatTime(download.timestamp),
                         details = listOfNotNull(
+                            download.downloadId?.let { "Download id: $it" },
+                            download.fileName?.let { "File: $it" },
+                            "Status: ${download.status}",
+                            download.reason?.let { "Reason: $it" },
+                            download.localUri?.let { "Local URI: $it" },
                             download.mimeType?.let { stringResource(R.string.debug_mime_label, it) },
                             download.contentDisposition?.let { stringResource(R.string.debug_disposition_label, it) },
                             download.userAgent?.let { stringResource(R.string.debug_user_agent_label, it) },
@@ -499,11 +592,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.resultItems(results: 
             DebugItem(
                 title = stringResource(R.string.debug_callback_result),
                 subtitle = "",
-                details = listOf(result),
+                details = formatCallbackResult(result),
             )
         }
     }
 }
+
+private fun formatCallbackResult(result: String): List<String> =
+    if (!result.trimStart().startsWith("{") && result.contains("=")) {
+        DebugResultFormatter.formatCookieHeader(result)
+    } else {
+        DebugResultFormatter.formatScriptResult(result)
+    }
 
 @Composable
 private fun HeaderRow(

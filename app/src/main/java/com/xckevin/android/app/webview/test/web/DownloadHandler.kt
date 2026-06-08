@@ -38,6 +38,70 @@ class DownloadHandler(
     ): Boolean {
         if (url.isBlank()) return false
 
+        val uri = Uri.parse(url)
+        return when (uri.scheme?.lowercase()) {
+            "http", "https" -> {
+                val result = enqueueSystemDownload(
+                    uri = uri,
+                    userAgent = userAgent,
+                    contentDisposition = contentDisposition,
+                    mimeType = mimeType,
+                )
+                emitDownloadRequested(
+                    url = url,
+                    userAgent = userAgent,
+                    contentDisposition = contentDisposition,
+                    mimeType = mimeType,
+                    contentLength = contentLength,
+                    downloadId = result.downloadId,
+                    fileName = result.fileName,
+                    status = if (result.success) "QUEUED" else "FAILED",
+                    reason = result.message,
+                )
+                result.success
+            }
+
+            "data" -> {
+                onMessage("Inline data download logged but not saved in v1")
+                emitDownloadRequested(
+                    url = url,
+                    userAgent = userAgent,
+                    contentDisposition = contentDisposition,
+                    mimeType = mimeType,
+                    contentLength = contentLength,
+                    status = "LOGGED",
+                    reason = "Inline data download logged but not saved",
+                )
+                true
+            }
+
+            else -> {
+                onMessage("Download skipped: unsupported URL scheme")
+                emitDownloadRequested(
+                    url = url,
+                    userAgent = userAgent,
+                    contentDisposition = contentDisposition,
+                    mimeType = mimeType,
+                    contentLength = contentLength,
+                    status = "SKIPPED",
+                    reason = "Unsupported URL scheme",
+                )
+                false
+            }
+        }
+    }
+
+    private fun emitDownloadRequested(
+        url: String,
+        userAgent: String?,
+        contentDisposition: String?,
+        mimeType: String?,
+        contentLength: Long,
+        downloadId: Long? = null,
+        fileName: String? = null,
+        status: String,
+        reason: String?,
+    ) {
         onEvent(
             WebPageEvent.DownloadRequested(
                 url = url,
@@ -46,28 +110,12 @@ class DownloadHandler(
                 mimeType = mimeType,
                 contentLength = contentLength,
                 navigationId = navigationTracker.activeNavigationId(),
+                downloadId = downloadId,
+                fileName = fileName,
+                status = status,
+                reason = reason,
             )
         )
-
-        val uri = Uri.parse(url)
-        return when (uri.scheme?.lowercase()) {
-            "http", "https" -> enqueueSystemDownload(
-                uri = uri,
-                userAgent = userAgent,
-                contentDisposition = contentDisposition,
-                mimeType = mimeType,
-            )
-
-            "data" -> {
-                onMessage("Inline data download logged but not saved in v1")
-                true
-            }
-
-            else -> {
-                onMessage("Download skipped: unsupported URL scheme")
-                false
-            }
-        }
     }
 
     private fun enqueueSystemDownload(
@@ -75,7 +123,7 @@ class DownloadHandler(
         userAgent: String?,
         contentDisposition: String?,
         mimeType: String?,
-    ): Boolean {
+    ): EnqueueResult {
         return runCatching {
             val fileName = URLUtil.guessFileName(uri.toString(), contentDisposition, mimeType)
             val request = DownloadManager.Request(uri)
@@ -89,12 +137,21 @@ class DownloadHandler(
             }
 
             val manager = context.getSystemService(DownloadManager::class.java)
-            manager.enqueue(request)
-            onMessage("Download started: $fileName")
-            true
+            val downloadId = manager.enqueue(request)
+            val message = "Download started: $fileName"
+            onMessage(message)
+            EnqueueResult(success = true, downloadId = downloadId, fileName = fileName, message = message)
         }.getOrElse { error ->
-            onMessage("Download failed: ${error.message.orEmpty()}")
-            false
+            val message = "Download failed: ${error.message.orEmpty()}"
+            onMessage(message)
+            EnqueueResult(success = false, downloadId = null, fileName = null, message = message)
         }
     }
+
+    private data class EnqueueResult(
+        val success: Boolean,
+        val downloadId: Long?,
+        val fileName: String?,
+        val message: String,
+    )
 }

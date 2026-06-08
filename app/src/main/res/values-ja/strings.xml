@@ -21,6 +21,8 @@
     <string name="action_paste">貼り付け</string>
     <string name="action_scan">スキャン</string>
     <string name="action_open_local_html">ローカル HTML を開く</string>
+    <string name="action_open_permission_fixture">権限テストページを開く</string>
+    <string name="action_open_local_fixture">ローカルデバッグテストページを開く</string>
     <string name="action_refresh">更新</string>
     <string name="action_fullscreen">全画面</string>
     <string name="action_exit_fullscreen">全画面を終了</string>

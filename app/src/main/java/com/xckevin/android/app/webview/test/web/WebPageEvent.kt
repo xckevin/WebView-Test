@@ -48,5 +48,16 @@ sealed interface WebPageEvent {
         val mimeType: String?,
         val contentLength: Long,
         val navigationId: Long = 0L,
+        val downloadId: Long? = null,
+        val fileName: String? = null,
+        val status: String = "REQUESTED",
+        val reason: String? = null,
+    ) : WebPageEvent
+
+    data class DownloadStatusChanged(
+        val downloadId: Long,
+        val status: String,
+        val reason: String?,
+        val localUri: String?,
     ) : WebPageEvent
 }

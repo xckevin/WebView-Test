@@ -21,6 +21,8 @@
     <string name="action_paste">Coller</string>
     <string name="action_scan">Scanner</string>
     <string name="action_open_local_html">Ouvrir un HTML local</string>
+    <string name="action_open_permission_fixture">Ouvrir le test des permissions</string>
+    <string name="action_open_local_fixture">Ouvrir le test local de débogage</string>
     <string name="action_refresh">Actualiser</string>
     <string name="action_fullscreen">Plein écran</string>
     <string name="action_exit_fullscreen">Quitter le plein écran</string>

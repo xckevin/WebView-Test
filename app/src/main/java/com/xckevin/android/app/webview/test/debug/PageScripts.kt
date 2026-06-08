@@ -37,28 +37,66 @@ object PageScripts {
         """.trimIndent()
     )
 
+    fun deleteStorageKey(storageName: String, key: String): String {
+        val safeStorageName = when (storageName) {
+            "localStorage" -> "localStorage"
+            "sessionStorage" -> "sessionStorage"
+            else -> "localStorage"
+        }
+        val encodedKey = key.toJsonStringLiteral()
+        return wrap(
+            """
+            ${safeStorageName}.removeItem($encodedKey);
+            return "${safeStorageName} key removed: ${key.toResultMessage()}";
+            """.trimIndent()
+        )
+    }
+
     fun readSource(): String = wrap(
         """
         return document.documentElement.outerHTML;
         """.trimIndent()
     )
 
-    fun readElementsSummary(): String = wrap(
+    fun readElementsSummary(search: String = "", selector: String = ""): String {
+        val querySelector = selector.ifBlank {
+            "a, button, input, textarea, select, form, img, video, iframe"
+        }.toJsonStringLiteral()
+        val searchText = search.toJsonStringLiteral()
+        return wrap(
         """
-        return Array.from(document.querySelectorAll("a, button, input, textarea, select, form, img, video, iframe"))
+        const selector = $querySelector;
+        const search = $searchText.trim().toLowerCase();
+        const matchesSearch = (summary) => {
+          if (!search) return true;
+          return [
+            summary.tag,
+            summary.id,
+            summary.name,
+            summary.type,
+            summary.text,
+            summary.href,
+            summary.src,
+            summary.className
+          ].some((value) => String(value || "").toLowerCase().includes(search));
+        };
+        return Array.from(document.querySelectorAll(selector))
           .slice(0, 250)
           .map((element) => ({
             tag: element.tagName.toLowerCase(),
             id: element.id || "",
+            className: element.className || "",
             name: element.getAttribute("name") || "",
             type: element.getAttribute("type") || "",
             text: (element.innerText || element.alt || element.value || "").trim().slice(0, 120),
             href: element.href || "",
             src: element.src || "",
             visible: !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
-          }));
+          }))
+          .filter(matchesSearch);
         """.trimIndent()
-    )
+        )
+    }
 
     fun executeUserScript(script: String): String {
         val escapedScript = script
@@ -93,4 +131,26 @@ object PageScripts {
         })();
         """.trimIndent()
     }
+
+    private fun String.toJsonStringLiteral(): String =
+        buildString {
+            append('"')
+            this@toJsonStringLiteral.forEach { char ->
+                when (char) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(char)
+                }
+            }
+            append('"')
+        }
+
+    private fun String.toResultMessage(): String =
+        replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
 }

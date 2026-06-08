@@ -2,6 +2,7 @@ package com.xckevin.android.app.webview.test.ui.workbench
 
 import com.xckevin.android.app.webview.test.FakeHistoryRepository
 import com.xckevin.android.app.webview.test.debug.PageStatus
+import com.xckevin.android.app.webview.test.debug.DownloadStatus
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
 import com.xckevin.android.app.webview.test.model.WebTestConfig
@@ -602,6 +603,38 @@ class WorkbenchViewModelTest {
         assertEquals("1", result.result)
         assertFalse(result.isError)
         assertEquals(5000L, result.timestamp)
+    }
+
+    @Test fun downloadStatusEventUpdatesDebugDownload() = runTest {
+        val viewModel = viewModel(clock = { 5500L })
+
+        viewModel.onWebPageEvent(
+            WebPageEvent.DownloadRequested(
+                url = "https://example.com/file.zip",
+                userAgent = null,
+                contentDisposition = null,
+                mimeType = "application/zip",
+                contentLength = 10L,
+                navigationId = 1L,
+                downloadId = 77L,
+                fileName = "file.zip",
+                status = "QUEUED",
+            )
+        )
+        viewModel.onWebPageEvent(
+            WebPageEvent.DownloadStatusChanged(
+                downloadId = 77L,
+                status = "SUCCESS",
+                reason = "Complete",
+                localUri = "file:///downloads/file.zip",
+            )
+        )
+
+        val download = viewModel.state.value.debugState.downloads.single()
+        assertEquals(DownloadStatus.SUCCESS, download.status)
+        assertEquals("Complete", download.reason)
+        assertEquals("file:///downloads/file.zip", download.localUri)
+        assertEquals(5500L, download.updatedAt)
     }
 
     @Test fun addDebugMessageAddsInfoConsoleEntry() = runTest {

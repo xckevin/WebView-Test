@@ -21,6 +21,8 @@
     <string name="action_paste">粘贴</string>
     <string name="action_scan">扫描</string>
     <string name="action_open_local_html">打开本地 HTML</string>
+    <string name="action_open_permission_fixture">打开权限测试页</string>
+    <string name="action_open_local_fixture">打开本地调试测试页</string>
     <string name="action_refresh">刷新</string>
     <string name="action_fullscreen">全屏</string>
     <string name="action_exit_fullscreen">退出全屏</string>
