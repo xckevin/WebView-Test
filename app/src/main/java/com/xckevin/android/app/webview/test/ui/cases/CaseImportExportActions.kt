@@ -11,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.data.CaseImportExport
 import com.xckevin.android.app.webview.test.data.TestCaseRepository
 import java.io.IOException
@@ -28,6 +30,10 @@ fun CaseImportExportActions(
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val exportSuccess = stringResource(R.string.cases_exported)
+    val exportFailed = stringResource(R.string.cases_export_failed)
+    val importSuccess = stringResource(R.string.cases_imported_skipped)
+    val importFailed = stringResource(R.string.cases_import_failed)
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
@@ -38,8 +44,8 @@ fun CaseImportExportActions(
             }
             onStatusMessage(
                 result.fold(
-                    onSuccess = { count -> "Exported $count cases" },
-                    onFailure = { error -> "Case export failed: ${error.message.orEmpty()}" },
+                    onSuccess = { count -> exportSuccess.format(count) },
+                    onFailure = { error -> exportFailed.format(error.message.orEmpty()) },
                 )
             )
         }
@@ -55,9 +61,9 @@ fun CaseImportExportActions(
             onStatusMessage(
                 result.fold(
                     onSuccess = { (importedCount, skippedCount) ->
-                        "Imported $importedCount cases, skipped $skippedCount conflicts"
+                        importSuccess.format(importedCount, skippedCount)
                     },
-                    onFailure = { error -> "Case import failed: ${error.message.orEmpty()}" },
+                    onFailure = { error -> importFailed.format(error.message.orEmpty()) },
                 )
             )
         }
@@ -68,10 +74,10 @@ fun CaseImportExportActions(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OutlinedButton(onClick = { exportLauncher.launch("webview-test-cases.json") }) {
-            Text("Export cases")
+            Text(stringResource(R.string.cases_export))
         }
         OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
-            Text("Import cases")
+            Text(stringResource(R.string.cases_import))
         }
     }
 }

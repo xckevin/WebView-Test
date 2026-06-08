@@ -18,9 +18,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.NoPhotography
+import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,8 +49,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.toClipEntry
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +62,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.scanner.BarcodeAnalyzer
 import com.xckevin.android.app.webview.test.scanner.ParsedScanResult
 import com.xckevin.android.app.webview.test.scanner.ScannerViewModel
@@ -96,14 +110,16 @@ fun ScannerScreen(
         ) {
             when {
                 state.cameraPermissionGranted == null -> ScannerStatus(
-                    title = "Opening camera",
-                    detail = "Waiting for camera permission.",
+                    icon = Icons.Outlined.CameraAlt,
+                    title = stringResource(R.string.scanner_opening_camera),
+                    detail = stringResource(R.string.scanner_waiting_permission),
                     onClose = onClose,
                 )
 
                 state.cameraPermissionGranted == false -> ScannerStatus(
-                    title = "Camera permission denied",
-                    detail = "Camera access is required to scan a barcode.",
+                    icon = Icons.Outlined.NoPhotography,
+                    title = stringResource(R.string.scanner_permission_denied),
+                    detail = stringResource(R.string.scanner_permission_required),
                     onClose = onClose,
                 )
 
@@ -118,7 +134,8 @@ fun ScannerScreen(
                 )
 
                 state.cameraError != null -> ScannerStatus(
-                    title = "Camera unavailable",
+                    icon = Icons.Outlined.ErrorOutline,
+                    title = stringResource(R.string.scanner_unavailable),
                     detail = state.cameraError.orEmpty(),
                     onClose = onClose,
                 )
@@ -190,6 +207,8 @@ private fun CameraBindingEffect(
 ) {
     val context = LocalContext.current
     val currentOnCameraError by rememberUpdatedState(onCameraError)
+    val unableToOpenCamera = stringResource(R.string.scanner_unable_open_camera)
+    val unableToBindPreview = stringResource(R.string.scanner_unable_bind_preview)
 
     DisposableEffect(previewView, lifecycleOwner, analyzer, cameraExecutor) {
         var disposed = false
@@ -199,7 +218,7 @@ private fun CameraBindingEffect(
             {
                 val provider = runCatching { cameraProviderFuture.get() }
                     .onFailure { error ->
-                        currentOnCameraError(error.message ?: "Unable to open the camera.")
+                        currentOnCameraError(error.message ?: unableToOpenCamera)
                     }
                     .getOrNull() ?: return@addListener
                 cameraProvider = provider
@@ -225,7 +244,7 @@ private fun CameraBindingEffect(
                         imageAnalysis,
                     )
                 }.onFailure { error ->
-                    currentOnCameraError(error.message ?: "Unable to bind the camera preview.")
+                    currentOnCameraError(error.message ?: unableToBindPreview)
                 }
             },
             ContextCompat.getMainExecutor(context),
@@ -246,25 +265,31 @@ private fun ScannerTopBar(
     Row(
         modifier = modifier
             .background(Color.Black.copy(alpha = 0.54f))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "Scanner",
+            text = stringResource(R.string.screen_scanner),
             color = Color.White,
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        OutlinedButton(onClick = onClose) {
-            Text("Close")
+        IconButton(
+            onClick = onClose,
+            colors = IconButtonDefaults.iconButtonColors(
+                contentColor = Color.White,
+            ),
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_close))
         }
     }
 }
 
 @Composable
 private fun ScannerStatus(
+    icon: ImageVector,
     title: String,
     detail: String,
     onClose: () -> Unit,
@@ -278,20 +303,28 @@ private fun ScannerStatus(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Text(
                 text = title,
+                modifier = Modifier.padding(top = 16.dp),
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
                 text = detail,
                 modifier = Modifier.padding(top = 8.dp),
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(
                 onClick = onClose,
-                modifier = Modifier.padding(top = 16.dp),
+                modifier = Modifier.padding(top = 24.dp),
             ) {
-                Text("Close")
+                Text(stringResource(R.string.action_close))
             }
         }
     }
@@ -320,7 +353,7 @@ private fun TextScanResult(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Scanned text",
+                text = stringResource(R.string.scanner_scanned_text),
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
@@ -331,10 +364,10 @@ private fun TextScanResult(
                 value = editableUrl,
                 onValueChange = onEditableUrlChanged,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Use as URL") },
+                label = { Text(stringResource(R.string.scanner_use_as_url)) },
                 singleLine = true,
                 isError = editError != null,
-                supportingText = editError?.let { { Text(it) } },
+                supportingText = editError?.let { error -> { Text(error.localizedScannerError()) } },
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -349,15 +382,35 @@ private fun TextScanResult(
                         }
                     },
                 ) {
-                    Text(if (copied) "Copied" else "Copy")
+                    Icon(
+                        Icons.Outlined.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        if (copied) stringResource(R.string.action_copied) else stringResource(R.string.action_copy),
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
                 }
                 Button(onClick = onUseAsUrl) {
-                    Text("Use as URL")
+                    Icon(
+                        Icons.Outlined.OpenInBrowser,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(stringResource(R.string.scanner_use_as_url), modifier = Modifier.padding(start = 4.dp))
                 }
                 OutlinedButton(onClick = onClose) {
-                    Text("Close")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         }
     }
 }
+
+@Composable
+private fun String.localizedScannerError(): String =
+    when (this) {
+        "Enter a valid http or https URL" -> stringResource(R.string.error_invalid_http_url)
+        else -> this
+    }

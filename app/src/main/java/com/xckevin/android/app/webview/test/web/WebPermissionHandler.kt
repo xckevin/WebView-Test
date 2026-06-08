@@ -13,11 +13,36 @@ data class WebPermissionPrompt(
     val onDeny: () -> Unit,
 )
 
+data class WebPermissionTextProvider(
+    val webCaptureTitle: String,
+    val webCaptureMessage: (String) -> String,
+    val geolocationTitle: String,
+    val geolocationMessage: String,
+    val camera: String,
+    val microphone: String,
+    val protectedDevicePermissions: String,
+    val joinAnd: (String, String) -> String,
+) {
+    companion object {
+        val English = WebPermissionTextProvider(
+            webCaptureTitle = "Allow web capture?",
+            webCaptureMessage = { permissionLabel -> "This page wants to use $permissionLabel." },
+            geolocationTitle = "Allow geolocation?",
+            geolocationMessage = "This page wants to access your location.",
+            camera = "camera",
+            microphone = "microphone",
+            protectedDevicePermissions = "protected device permissions",
+            joinAnd = { first, second -> "$first and $second" },
+        )
+    }
+}
+
 class WebPermissionHandler(
     private val configProvider: () -> WebTestConfig,
     private val requestRuntimePermissions: (Array<String>, (Map<String, Boolean>) -> Unit) -> Unit,
     private val showPrompt: (WebPermissionPrompt?) -> Unit,
     private val onMessage: (String) -> Unit = {},
+    private val textProvider: WebPermissionTextProvider = WebPermissionTextProvider.English,
 ) {
     private var pendingMediaRequest: PendingRequest? = null
     private var pendingGeolocationRequest: PendingRequest? = null
@@ -74,8 +99,8 @@ class WebPermissionHandler(
         if (shouldAskUser) {
             showPrompt(
                 WebPermissionPrompt(
-                    title = "Allow web capture?",
-                    message = "This page wants to use ${allowedResources.permissionLabel()}.",
+                    title = textProvider.webCaptureTitle,
+                    message = textProvider.webCaptureMessage(allowedResources.permissionLabel()),
                     onAllow = grantAfterRuntimePermission,
                     onDeny = {
                         if (pendingMediaRequest === pendingRequest) {
@@ -128,8 +153,8 @@ class WebPermissionHandler(
                 pendingGeolocationRequest = pendingRequest
                 showPrompt(
                     WebPermissionPrompt(
-                        title = "Allow geolocation?",
-                        message = "This page wants to access your location.",
+                        title = textProvider.geolocationTitle,
+                        message = textProvider.geolocationMessage,
                         onAllow = { grantGeolocationAfterRuntimePermission(pendingRequest) },
                         onDeny = {
                             if (pendingGeolocationRequest === pendingRequest) {
@@ -270,11 +295,19 @@ class WebPermissionHandler(
     private fun List<String>.permissionLabel(): String =
         map {
             when (it) {
-                PermissionRequest.RESOURCE_VIDEO_CAPTURE -> "camera"
-                PermissionRequest.RESOURCE_AUDIO_CAPTURE -> "microphone"
-                else -> "protected device permissions"
+                PermissionRequest.RESOURCE_VIDEO_CAPTURE -> textProvider.camera
+                PermissionRequest.RESOURCE_AUDIO_CAPTURE -> textProvider.microphone
+                else -> textProvider.protectedDevicePermissions
             }
-        }.distinct().joinToString(" and ")
+        }.distinct().joinWithAnd()
+
+    private fun List<String>.joinWithAnd(): String =
+        when (size) {
+            0 -> ""
+            1 -> first()
+            2 -> textProvider.joinAnd(this[0], this[1])
+            else -> dropLast(1).joinToString(", ") + ", " + textProvider.joinAnd("", last()).trim()
+        }
 }
 
 private class PendingRequest(

@@ -1,22 +1,31 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.HistoryToggleOff
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import java.text.DateFormat
 import java.util.Date
@@ -30,35 +39,31 @@ fun HistoryPanel(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = "Recent history",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                OutlinedButton(
-                    enabled = history.isNotEmpty(),
-                    onClick = onClearHistory,
-                ) {
-                    Text("Clear history")
-                }
-            }
+            PanelHeader(
+                title = stringResource(R.string.history_recent),
+                actions = {
+                    if (history.isNotEmpty()) {
+                        IconButton(onClick = onClearHistory) {
+                            Icon(
+                                Icons.Outlined.DeleteSweep,
+                                contentDescription = stringResource(R.string.action_clear_history),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+            )
         }
 
         if (history.isEmpty()) {
             item {
-                Text(
-                    text = "No history yet",
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
+                PanelEmptyState(
+                    icon = Icons.Outlined.HistoryToggleOff,
+                    text = stringResource(R.string.history_empty),
                 )
             }
         } else {
@@ -80,35 +85,43 @@ private fun HistoryRow(
     item: HistoryItem,
     onOpenHistoryItem: (HistoryItem) -> Unit,
 ) {
-    OutlinedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .clickable(
+                onClickLabel = stringResource(R.string.action_open_history_item),
+                role = Role.Button,
+                onClick = { onOpenHistoryItem(item) },
+            ),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
                 text = item.title.ifBlank { item.url },
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = item.url,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = DateFormat.getDateTimeInstance().format(Date(item.visitedAt)),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(onClick = { onOpenHistoryItem(item) }) {
-                Text("Open")
-            }
         }
     }
 }

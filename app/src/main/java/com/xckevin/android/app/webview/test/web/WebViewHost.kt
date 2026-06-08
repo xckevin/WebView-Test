@@ -17,7 +17,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.model.WebCacheMode
 import com.xckevin.android.app.webview.test.model.WebTestConfig
 
@@ -30,11 +32,21 @@ class WebViewController {
 
     fun canGoBack(): Boolean = webView?.canGoBack() == true
 
+    fun canGoForward(): Boolean = webView?.canGoForward() == true
+
     fun goBack(): Boolean {
         val webView = webView ?: return false
         if (!webView.canGoBack()) return false
 
         webView.goBack()
+        return true
+    }
+
+    fun goForward(): Boolean {
+        val webView = webView ?: return false
+        if (!webView.canGoForward()) return false
+
+        webView.goForward()
         return true
     }
 
@@ -202,6 +214,20 @@ fun WebViewHost(
     val currentOnWebPermissionPrompt = rememberUpdatedState(onWebPermissionPrompt)
     val currentOnFullscreenVideoChanged = rememberUpdatedState(onFullscreenVideoChanged)
     val currentOnContextMenuTarget = rememberUpdatedState(onContextMenuTarget)
+    val context = LocalContext.current
+    val webCaptureMessageTemplate = context.getString(R.string.permission_allow_web_capture_message)
+    val permissionAndTemplate = context.getString(R.string.permission_list_and)
+    val permissionTextProvider = WebPermissionTextProvider(
+        webCaptureTitle = context.getString(R.string.permission_allow_web_capture_title),
+        webCaptureMessage = { label -> webCaptureMessageTemplate.format(label) },
+        geolocationTitle = context.getString(R.string.permission_allow_geolocation_title),
+        geolocationMessage = context.getString(R.string.permission_allow_geolocation_message),
+        camera = context.getString(R.string.permission_camera),
+        microphone = context.getString(R.string.permission_microphone),
+        protectedDevicePermissions = context.getString(R.string.permission_protected_device_permissions),
+        joinAnd = { first, second -> permissionAndTemplate.format(first, second) },
+    )
+    val currentPermissionTextProvider = rememberUpdatedState(permissionTextProvider)
     val navigationTracker = remember { WebViewNavigationTracker() }
     var lastLoadedNavigation by remember { mutableStateOf<LoadedNavigationKey?>(null) }
     var fullscreenVideoView by remember { mutableStateOf<View?>(null) }
@@ -245,6 +271,7 @@ fun WebViewHost(
                         },
                         showPrompt = { prompt -> currentOnWebPermissionPrompt.value(prompt) },
                         onMessage = messageSink,
+                        textProvider = currentPermissionTextProvider.value,
                     )
                     val downloadHandler = DownloadHandler(
                         context = context.applicationContext,

@@ -1,16 +1,26 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,10 +28,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.model.WebTestCase
 
 @Composable
@@ -40,35 +54,28 @@ fun CasesPanel(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Save current case",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            PanelSection(title = stringResource(R.string.cases_save_current)) {
                 OutlinedTextField(
                     value = caseName,
                     onValueChange = { caseName = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.cases_name)) },
                     singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
                 )
                 OutlinedTextField(
                     value = caseNote,
                     onValueChange = { caseNote = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Note") },
+                    label = { Text(stringResource(R.string.cases_note)) },
                     minLines = 2,
+                    textStyle = MaterialTheme.typography.bodyMedium,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PanelActionRow {
                     Button(
                         enabled = canSaveCurrentCase && caseName.isNotBlank(),
                         onClick = {
@@ -77,13 +84,21 @@ fun CasesPanel(
                             caseNote = ""
                         },
                     ) {
-                        Text("Save")
+                        Text(stringResource(R.string.action_save))
                     }
-                    OutlinedButton(onClick = onImport) {
-                        Text("Import")
+                    IconButton(onClick = onImport) {
+                        Icon(
+                            Icons.Outlined.FileDownload,
+                            contentDescription = stringResource(R.string.action_import),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    OutlinedButton(onClick = onExport) {
-                        Text("Export")
+                    IconButton(onClick = onExport) {
+                        Icon(
+                            Icons.Outlined.FileUpload,
+                            contentDescription = stringResource(R.string.action_export),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -91,10 +106,9 @@ fun CasesPanel(
 
         if (cases.isEmpty()) {
             item {
-                Text(
-                    text = "No saved cases",
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
+                PanelEmptyState(
+                    icon = Icons.Outlined.FolderOff,
+                    text = stringResource(R.string.cases_empty),
                 )
             }
         } else {
@@ -118,43 +132,60 @@ private fun CaseRow(
     onOpenCase: (WebTestCase) -> Unit,
     onDeleteCase: (WebTestCase) -> Unit,
 ) {
-    OutlinedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .clickable(
+                onClickLabel = stringResource(R.string.action_open_case),
+                role = Role.Button,
+                onClick = { onOpenCase(testCase) },
+            ),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                text = testCase.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = testCase.url,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (testCase.note.isNotBlank()) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
-                    text = testCase.note,
+                    text = testCase.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = testCase.url,
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (testCase.note.isNotBlank()) {
+                    Text(
+                        text = testCase.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onOpenCase(testCase) }) {
-                    Text("Open")
-                }
-                OutlinedButton(onClick = { onDeleteCase(testCase) }) {
-                    Text("Delete")
-                }
+            IconButton(onClick = { onDeleteCase(testCase) }) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.cases_delete_named, testCase.name),
+                    tint = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }

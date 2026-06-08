@@ -677,6 +677,25 @@ class WorkbenchViewModelTest {
         assertFalse(viewModel.state.value.isVideoFullscreen)
     }
 
+    @Test fun appFullscreenHidesUrlBarPanelsAndShowsExitOverlay() = runTest {
+        assertTrue(WorkbenchState().shouldShowUrlBar())
+        assertFalse(WorkbenchState().shouldShowFullscreenExitOverlay())
+
+        val state = WorkbenchState(isFullscreen = true)
+
+        assertFalse(state.shouldShowUrlBar())
+        assertFalse(state.shouldShowPanels())
+        assertTrue(state.shouldShowFullscreenExitOverlay())
+    }
+
+    @Test fun videoFullscreenHidesUrlBarAndShowsExitOverlay() = runTest {
+        val state = WorkbenchState(isVideoFullscreen = true)
+
+        assertFalse(state.shouldShowUrlBar())
+        assertFalse(state.shouldShowPanels())
+        assertTrue(state.shouldShowFullscreenExitOverlay())
+    }
+
     private fun viewModel(clock: () -> Long = { 1000L }) =
         WorkbenchViewModel(
             testCaseRepository = testCaseRepository,
