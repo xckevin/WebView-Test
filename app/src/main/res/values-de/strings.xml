@@ -29,6 +29,7 @@
     <string name="action_download_url">URL herunterladen</string>
     <string name="action_view_resource_url">Ressourcen-URL anzeigen</string>
     <string name="action_clear_history">Verlauf leeren</string>
+    <string name="action_delete_history_item">Verlaufseintrag löschen</string>
     <string name="action_open_tools">Open tools</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
@@ -75,6 +76,8 @@
 
     <string name="history_recent">Letzter Verlauf</string>
     <string name="history_empty">Noch kein Verlauf</string>
+    <string name="history_group_today">Heute</string>
+    <string name="history_group_yesterday">Gestern</string>
 
     <string name="debug_group_logs">Logs</string>
     <string name="debug_group_page">Page</string>

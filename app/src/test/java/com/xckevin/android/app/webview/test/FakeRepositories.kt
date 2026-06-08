@@ -11,6 +11,7 @@ class FakeHistoryRepository(
 ) : HistoryRepository {
     private val items = MutableStateFlow(initialItems)
     val insertedItems = mutableListOf<HistoryItem>()
+    val deletedIds = mutableListOf<Long>()
     var clearCount = 0
 
     override fun observeRecent(limit: Int): Flow<List<HistoryItem>> =
@@ -31,5 +32,10 @@ class FakeHistoryRepository(
     override suspend fun clear() {
         clearCount += 1
         items.value = emptyList()
+    }
+
+    override suspend fun delete(item: HistoryItem) {
+        deletedIds += item.id
+        items.value = items.value.filterNot { it.id == item.id }
     }
 }

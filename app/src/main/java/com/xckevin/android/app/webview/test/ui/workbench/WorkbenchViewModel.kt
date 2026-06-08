@@ -131,6 +131,12 @@ class WorkbenchViewModel(
         }
     }
 
+    fun deleteHistoryItem(item: HistoryItem) {
+        viewModelScope.launch {
+            historyRepository.delete(item)
+        }
+    }
+
     fun onWebPageEvent(event: WebPageEvent) {
         when (event) {
             is WebPageEvent.PageStarted -> {

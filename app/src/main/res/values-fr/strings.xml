@@ -29,6 +29,7 @@
     <string name="action_download_url">Télécharger URL</string>
     <string name="action_view_resource_url">Voir URL de la ressource</string>
     <string name="action_clear_history">Effacer l\'historique</string>
+    <string name="action_delete_history_item">Supprimer l\'élément d\'historique</string>
     <string name="action_open_tools">Open tools</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
@@ -75,6 +76,8 @@
 
     <string name="history_recent">Historique récent</string>
     <string name="history_empty">Aucun historique pour le moment</string>
+    <string name="history_group_today">Aujourd\'hui</string>
+    <string name="history_group_yesterday">Hier</string>
 
     <string name="debug_group_logs">Logs</string>
     <string name="debug_group_page">Page</string>

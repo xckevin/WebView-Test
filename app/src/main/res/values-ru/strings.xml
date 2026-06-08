@@ -29,6 +29,7 @@
     <string name="action_download_url">Скачать URL</string>
     <string name="action_view_resource_url">Показать URL ресурса</string>
     <string name="action_clear_history">Очистить историю</string>
+    <string name="action_delete_history_item">Удалить запись истории</string>
     <string name="action_open_tools">Open tools</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
@@ -75,6 +76,8 @@
 
     <string name="history_recent">Недавняя история</string>
     <string name="history_empty">Истории пока нет</string>
+    <string name="history_group_today">Сегодня</string>
+    <string name="history_group_yesterday">Вчера</string>
 
     <string name="debug_group_logs">Logs</string>
     <string name="debug_group_page">Page</string>

@@ -8,6 +8,7 @@ interface HistoryRepository {
     fun observeRecent(limit: Int = 200): Flow<List<HistoryItem>>
     suspend fun insert(item: HistoryItem): Long
     suspend fun clear()
+    suspend fun delete(item: HistoryItem)
 }
 
 class RoomHistoryRepository(
@@ -21,6 +22,10 @@ class RoomHistoryRepository(
 
     override suspend fun clear() {
         dao.clear()
+    }
+
+    override suspend fun delete(item: HistoryItem) {
+        dao.deleteById(item.id)
     }
 }
 

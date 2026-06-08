@@ -570,6 +570,28 @@ class WorkbenchViewModelTest {
         assertTrue(debugState.jsResults.isEmpty())
     }
 
+    @Test fun deleteHistoryItemRemovesOneHistoryEntry() = runTest {
+        val repository = FakeHistoryRepository(
+            initialItems = listOf(
+                historyItem(id = 1L, url = "https://first.example.com"),
+                historyItem(id = 2L, url = "https://second.example.com"),
+            )
+        )
+        val viewModel = WorkbenchViewModel(
+            historyRepository = repository,
+            clock = { 1000L },
+        )
+
+        viewModel.deleteHistoryItem(historyItem(id = 1L, url = "https://first.example.com"))
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L), repository.deletedIds)
+        assertEquals(
+            listOf(historyItem(id = 2L, url = "https://second.example.com")),
+            repository.observeRecent().first(),
+        )
+    }
+
     @Test fun recordJavaScriptResultAddsDebugResult() = runTest {
         val viewModel = viewModel(clock = { 5000L })
 

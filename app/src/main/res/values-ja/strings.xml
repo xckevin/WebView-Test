@@ -29,6 +29,7 @@
     <string name="action_download_url">URL をダウンロード</string>
     <string name="action_view_resource_url">リソース URL を表示</string>
     <string name="action_clear_history">履歴をクリア</string>
+    <string name="action_delete_history_item">履歴項目を削除</string>
     <string name="action_open_tools">Open tools</string>
     <string name="action_open_history_item">Open history item</string>
     <string name="action_more">More</string>
@@ -71,6 +72,8 @@
     <string name="enum_ask_every_time">毎回確認</string>
     <string name="history_recent">最近の履歴</string>
     <string name="history_empty">履歴はまだありません</string>
+    <string name="history_group_today">今日</string>
+    <string name="history_group_yesterday">昨日</string>
     <string name="debug_group_logs">Logs</string>
     <string name="debug_group_page">Page</string>
     <string name="debug_group_storage">Storage</string>
