@@ -434,7 +434,7 @@ private fun TreeElementRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (12 + depth * 14).dp, end = 12.dp, top = 2.dp, bottom = 2.dp)
+            .padding(horizontal = 12.dp, vertical = 2.dp)
             .clickable(onClick = onClick),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
@@ -446,7 +446,7 @@ private fun TreeElementRow(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
-                text = element.label(),
+                text = "${"  ".repeat(depth)}${element.label().ifBlank { "(unknown element)" }}",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
@@ -560,9 +560,7 @@ private fun ElementRow(
 @Composable
 private fun ElementDetails(element: DebugInspectElement) {
     Column(
-        modifier = Modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(start = 36.dp),
+        modifier = Modifier.padding(start = 36.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         DetailLine("tag", element.tag)
@@ -672,13 +670,12 @@ private fun ErrorBanner(error: String) {
 @Composable
 private fun DetailLine(label: String, value: String) {
     if (value.isBlank()) return
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = label,
-            modifier = Modifier.weight(0.28f),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
@@ -686,7 +683,6 @@ private fun DetailLine(label: String, value: String) {
         )
         Text(
             text = value,
-            modifier = Modifier.weight(0.72f),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
