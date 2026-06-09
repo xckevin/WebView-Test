@@ -1,5 +1,8 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +33,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.xckevin.android.app.webview.test.R
+import com.xckevin.android.app.webview.test.debug.DebugEvent
+import com.xckevin.android.app.webview.test.debug.DebugEventType
+import com.xckevin.android.app.webview.test.debug.DebugSeverity
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.SourceType
@@ -173,6 +179,208 @@ class WorkbenchScreenTest {
     }
 
     @Test
+    fun debugPanelHeaderUsesModeTitleConsistently() {
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                Box(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .height(640.dp),
+                ) {
+                    DebugPanel(
+                        debugState = DebugState(),
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
+                        onClearDebugLogs = {},
+                        onEvaluateJavaScript = { _, callback -> callback("") },
+                        onReadCookies = { callback -> callback("") },
+                        onClearCookies = {},
+                        onClearWebViewCache = {},
+                        selectedMode = DebugMode.Overview,
+                        showModeTabs = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Overview").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Debug overview").assertCountEquals(0)
+    }
+
+    @Test
+    fun debugPanelHeaderKeepsLayoutWhenClearActionAppears() {
+        var debugState by mutableStateOf(DebugState())
+
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                Box(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .height(640.dp),
+                ) {
+                    DebugPanel(
+                        debugState = debugState,
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
+                        onClearDebugLogs = {},
+                        onEvaluateJavaScript = { _, callback -> callback("") },
+                        onReadCookies = { callback -> callback("") },
+                        onClearCookies = {},
+                        onClearWebViewCache = {},
+                        selectedMode = DebugMode.Overview,
+                        showModeTabs = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        val emptyHeaderTitle = composeRule.onNodeWithText("Overview").getUnclippedBoundsInRoot()
+
+        composeRule.runOnIdle {
+            debugState = DebugState(
+                timeline = listOf(
+                    DebugEvent(
+                        id = 1L,
+                        type = DebugEventType.PAGE,
+                        severity = DebugSeverity.INFO,
+                        summary = "Page loaded",
+                        timestamp = 1L,
+                    ),
+                ),
+            )
+        }
+        composeRule.waitForIdle()
+
+        val populatedHeaderTitle = composeRule.onNodeWithText("Overview").getUnclippedBoundsInRoot()
+        assertEquals(emptyHeaderTitle.top, populatedHeaderTitle.top)
+        assertEquals(emptyHeaderTitle.bottom - emptyHeaderTitle.top, populatedHeaderTitle.bottom - populatedHeaderTitle.top)
+        composeRule.onNodeWithContentDescription(text(R.string.action_clear)).assertIsDisplayed()
+    }
+
+    @Test
+    fun debugUtilityPanelsUseUnifiedSections() {
+        var selectedMode by mutableStateOf(DebugMode.Page)
+
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                Box(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .height(640.dp),
+                ) {
+                    DebugPanel(
+                        debugState = DebugState(),
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
+                        onClearDebugLogs = {},
+                        onEvaluateJavaScript = { _, callback -> callback("") },
+                        onReadCookies = { callback -> callback("") },
+                        onClearCookies = {},
+                        onClearWebViewCache = {},
+                        selectedMode = selectedMode,
+                        showModeTabs = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Page details").assertIsDisplayed()
+        composeRule.onNodeWithText("Actions").assertIsDisplayed()
+        composeRule.onNodeWithText("Environment").assertIsDisplayed()
+
+        composeRule.runOnIdle { selectedMode = DebugMode.Storage }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Actions").assertIsDisplayed()
+        composeRule.onNodeWithText("Results").assertIsDisplayed()
+        composeRule.onAllNodesWithText(text(R.string.debug_tab_cookies)).assertCountEquals(0)
+
+        composeRule.runOnIdle { selectedMode = DebugMode.Inspect }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Inputs").assertIsDisplayed()
+        composeRule.onNodeWithText("Actions").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Element query").assertCountEquals(0)
+
+        composeRule.runOnIdle { selectedMode = DebugMode.Execute }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Inputs").assertIsDisplayed()
+        composeRule.onNodeWithText("Actions").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Script").assertCountEquals(0)
+    }
+
+    @Test
+    fun debugFiltersUseDropdownSelectors() {
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                Box(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .height(640.dp),
+                ) {
+                    DebugPanel(
+                        debugState = DebugState(),
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
+                        onClearDebugLogs = {},
+                        onEvaluateJavaScript = { _, callback -> callback("") },
+                        onReadCookies = { callback -> callback("") },
+                        onClearCookies = {},
+                        onClearWebViewCache = {},
+                        selectedMode = DebugMode.Timeline,
+                        showModeTabs = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Severity: All").assertIsDisplayed()
+        composeRule.onNodeWithText("Event type: Any type").assertIsDisplayed()
+        composeRule.onNodeWithText("Severity: All").performClick()
+        composeRule.onNodeWithText("WARNING").assertIsDisplayed()
+    }
+
+    @Test
+    fun debugPanelDoesNotShowDuplicateClearActions() {
+        var selectedMode by mutableStateOf(DebugMode.Overview)
+
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                Box(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .height(640.dp),
+                ) {
+                    DebugPanel(
+                        debugState = DebugState(),
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
+                        onClearDebugLogs = {},
+                        onEvaluateJavaScript = { _, callback -> callback("") },
+                        onReadCookies = { callback -> callback("") },
+                        onClearCookies = {},
+                        onClearWebViewCache = {},
+                        selectedMode = selectedMode,
+                        showModeTabs = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        DebugMode.entries.forEach { mode ->
+            composeRule.runOnIdle {
+                selectedMode = mode
+            }
+            composeRule.onAllNodesWithText("Clear current nav").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Clear logs tab").assertCountEquals(0)
+            composeRule.onAllNodesWithText("Clear network").assertCountEquals(0)
+        }
+    }
+
+    @Test
     fun historyPanelShowsVisitedUrl() {
         composeRule.setContent {
             WebViewTestTheme(darkTheme = false) {
@@ -297,8 +505,8 @@ class WorkbenchScreenTest {
 
         composeRule.onNodeWithText(text(R.string.action_open_tools)).performClick()
 
-        composeRule.onNodeWithText("Overview").assertIsDisplayed()
-        composeRule.onNodeWithText("Timeline").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Overview").assertCountEquals(2)
+        composeRule.onAllNodesWithText("Timeline").assertCountEquals(1)
         composeRule.onAllNodesWithText(text(R.string.panel_config)).assertCountEquals(0)
         composeRule.onAllNodesWithText(text(R.string.config_javascript)).assertCountEquals(0)
         composeRule.onNodeWithTag("workbench_drawer").assertIsDisplayed()
@@ -398,8 +606,8 @@ class WorkbenchScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Overview").assertIsDisplayed()
-        composeRule.onNodeWithText("Timeline").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Overview").assertCountEquals(2)
+        composeRule.onAllNodesWithText("Timeline").assertCountEquals(1)
         composeRule.onAllNodesWithText("Network").assertCountEquals(1)
         composeRule.onAllNodesWithText(text(R.string.panel_config)).assertCountEquals(0)
         composeRule.onAllNodesWithText(text(R.string.panel_history)).assertCountEquals(0)
@@ -453,6 +661,28 @@ class WorkbenchScreenTest {
         assertTrue(forwardClicked)
         assertTrue(refreshClicked)
         assertTrue(fullscreenClicked)
+    }
+
+    @Test
+    fun shareDebugTextReportsSystemFailureWithoutThrowing() {
+        var failure: Throwable? = null
+        val throwingContext = object : ContextWrapper(
+            InstrumentationRegistry.getInstrumentation().targetContext,
+        ) {
+            override fun startActivity(intent: Intent?) {
+                throw RuntimeException("Failure from system")
+            }
+        }
+
+        val started = shareDebugText(
+            context = throwingContext,
+            title = "Debug bundle",
+            value = "payload",
+            onFailure = { failure = it },
+        )
+
+        assertFalse(started)
+        assertEquals("Failure from system", failure?.message)
     }
 
     private fun text(@StringRes resId: Int): String =

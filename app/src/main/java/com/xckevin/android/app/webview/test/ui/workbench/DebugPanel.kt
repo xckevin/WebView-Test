@@ -1,6 +1,8 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
+import android.app.Activity
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,10 +32,8 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Timeline
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -135,11 +136,12 @@ internal fun DebugPanel(
         selectedStorageResult = storageResult
     }
     val shareText: (String, String) -> Unit = { title, value ->
-        val intent = Intent(Intent.ACTION_SEND)
-            .setType("text/plain")
-            .putExtra(Intent.EXTRA_SUBJECT, title)
-            .putExtra(Intent.EXTRA_TEXT, value)
-        context.startActivity(Intent.createChooser(intent, title))
+        shareDebugText(
+            context = context,
+            title = title,
+            value = value,
+            onFailure = { copyText(title, value) },
+        )
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -183,6 +185,7 @@ internal fun DebugPanel(
                 onClearDebug = onClearDebug,
                 onCopy = copyText,
                 onShare = shareText,
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -190,6 +193,7 @@ internal fun DebugPanel(
                 events = debugState.timeline,
                 onClearDebug = onClearDebug,
                 onCopy = copyText,
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -199,6 +203,7 @@ internal fun DebugPanel(
                 onClearDebugLogs = onClearDebugLogs,
                 onClearDebug = onClearDebug,
                 onCopy = copyText,
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -208,6 +213,7 @@ internal fun DebugPanel(
                 sourceType = sourceType,
                 onClearWebViewCache = onClearWebViewCache,
                 onCopy = copyText,
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -218,6 +224,7 @@ internal fun DebugPanel(
                 results = storageResults,
                 onCopy = copyText,
                 onOpenResult = { selectedStorageResult = it },
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -226,6 +233,7 @@ internal fun DebugPanel(
                 onResult = { result -> inspectResult = result },
                 hasResult = inspectResult != null,
                 onCopy = copyText,
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -238,6 +246,7 @@ internal fun DebugPanel(
                 onCopy = copyText,
                 onOpenRequest = { selectedNetworkRequest = it },
                 onOpenDownload = { selectedNetworkDownload = it },
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -248,6 +257,7 @@ internal fun DebugPanel(
                 onResult = captureResult,
                 onCopy = copyText,
                 onClearDebug = onClearDebug,
+                showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
@@ -329,6 +339,30 @@ internal fun DebugPanel(
     }
 }
 
+internal fun shareDebugText(
+    context: Context,
+    title: String,
+    value: String,
+    onFailure: (Throwable) -> Unit = {},
+): Boolean {
+    val sendIntent = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_SUBJECT, title)
+        .putExtra(Intent.EXTRA_TEXT, value)
+    val chooserIntent = Intent.createChooser(sendIntent, title).apply {
+        if (context !is Activity) {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+    return try {
+        context.startActivity(chooserIntent)
+        true
+    } catch (error: RuntimeException) {
+        onFailure(error)
+        false
+    }
+}
+
 @Composable
 private fun OverviewTab(
     debugState: DebugState,
@@ -337,6 +371,7 @@ private fun OverviewTab(
     onClearDebug: (DebugClearScope) -> Unit,
     onCopy: (String, String) -> Unit,
     onShare: (String, String) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val page = debugState.page
@@ -352,28 +387,25 @@ private fun OverviewTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
-            HeaderRow(
-                title = "Debug overview",
+        if (showHeader) {
+            item {
+            DebugPanelHeader(
+                mode = DebugMode.Overview,
                 canClear = debugState.hasDebugEntries(),
-                onClearDebugLogs = { onClearDebug(DebugClearScope.ALL) },
+                onClear = { onClearDebug(DebugClearScope.ALL) },
             )
-        }
-        item {
-            val bundle = debugState.toDebugBundle(config, sourceType)
-            ButtonRow {
-                FilledTonalButton(onClick = { onCopy("debug-bundle", bundle) }) {
-                    Text("Copy debug bundle")
-                }
-                OutlinedButton(onClick = { onShare("WebViewTest debug bundle", bundle) }) {
-                    Text("Share")
-                }
             }
         }
         item {
-            ButtonRow {
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.CURRENT_NAVIGATION) }) {
-                    Text("Clear current nav")
+            val bundle = debugState.toDebugBundle(config, sourceType)
+            DebugControlSection(title = "Actions") {
+                ButtonRow {
+                    FilledTonalButton(onClick = { onCopy("debug-bundle", bundle) }) {
+                        Text("Copy debug bundle")
+                    }
+                    OutlinedButton(onClick = { onShare("WebViewTest debug bundle", bundle) }) {
+                        Text("Share")
+                    }
                 }
             }
         }
@@ -459,6 +491,7 @@ private fun TimelineTab(
     events: List<DebugEvent>,
     onClearDebug: (DebugClearScope) -> Unit,
     onCopy: (String, String) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -477,49 +510,50 @@ private fun TimelineTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            HeaderRow(
-                title = "Timeline",
+        if (showHeader) {
+            item {
+            DebugPanelHeader(
+                mode = DebugMode.Timeline,
                 canClear = events.isNotEmpty(),
-                onClearDebugLogs = { onClearDebug(DebugClearScope.ALL) },
+                onClear = { onClearDebug(DebugClearScope.ALL) },
             )
-        }
-        item {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search timeline") },
-                leadingIcon = {
-                    Icon(Icons.Outlined.FilterList, contentDescription = null)
-                },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
-        }
-        item {
-            FilterRow {
-                FilterChip(selected = severity == null, onClick = { severity = null }, label = { Text("All") })
-                DebugSeverity.entries.forEach { item ->
-                    FilterChip(selected = severity == item, onClick = { severity = item }, label = { Text(item.name) })
-                }
             }
         }
         item {
-            FilterRow {
-                FilterChip(selected = type == null, onClick = { type = null }, label = { Text("Any type") })
-                DebugEventType.entries.forEach { item ->
-                    FilterChip(selected = type == item, onClick = { type = item }, label = { Text(item.name.lowercase()) })
-                }
+            DebugControlSection(title = "Filters") {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search timeline") },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.FilterList, contentDescription = null)
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+                DropdownFilter(
+                    label = "Severity",
+                    selectedLabel = severity?.name ?: "All",
+                    options = listOf<Pair<String, DebugSeverity?>>("All" to null) +
+                        DebugSeverity.entries.map { it.name to it },
+                    onSelected = { severity = it },
+                )
+                DropdownFilter(
+                    label = "Event type",
+                    selectedLabel = type?.name?.lowercase() ?: "Any type",
+                    options = listOf<Pair<String, DebugEventType?>>("Any type" to null) +
+                        DebugEventType.entries.map { it.name.lowercase() to it },
+                    onSelected = { type = it },
+                )
             }
         }
         item {
-            ButtonRow {
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.CURRENT_NAVIGATION) }) {
-                    Text("Clear current nav")
-                }
-                OutlinedButton(onClick = { onCopy("debug-timeline", filtered.joinToString("\n") { it.copyText() }) }) {
-                    Text("Copy filtered")
+            DebugControlSection(title = "Actions") {
+                ButtonRow {
+                    OutlinedButton(onClick = { onCopy("debug-timeline", filtered.joinToString("\n") { it.copyText() }) }) {
+                        Text("Copy filtered")
+                    }
                 }
             }
         }
@@ -553,6 +587,7 @@ private fun LogsTab(
     onClearDebugLogs: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit,
     onCopy: (String, String) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -572,42 +607,34 @@ private fun LogsTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            HeaderRow(
-                title = stringResource(R.string.debug_group_logs),
+        if (showHeader) {
+            item {
+            DebugPanelHeader(
+                mode = DebugMode.Logs,
                 canClear = logs.isNotEmpty() || errors.isNotEmpty(),
-                onClearDebugLogs = onClearDebugLogs,
+                onClear = onClearDebugLogs,
             )
-        }
-        item {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search logs") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
-        }
-        item {
-            FilterRow {
-                FilterChip(selected = level == null, onClick = { level = null }, label = { Text("All") })
-                listOf("ERROR", "WARNING", "WARN", "LOG", "INFO").forEach { item ->
-                    FilterChip(selected = level == item, onClick = { level = item }, label = { Text(item) })
-                }
             }
         }
         item {
-            ButtonRow {
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.CONSOLE) }) {
-                    Text("Clear logs tab")
-                }
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.CURRENT_NAVIGATION) }) {
-                    Text("Clear current nav")
-                }
+            DebugControlSection(title = "Filters") {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search logs") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+                DropdownFilter(
+                    label = "Level",
+                    selectedLabel = level ?: "All",
+                    options = listOf<Pair<String, String?>>("All" to null) +
+                        listOf("ERROR", "WARNING", "WARN", "LOG", "INFO").map { it to it },
+                    onSelected = { level = it },
+                )
             }
         }
-
         if (filteredLogs.isEmpty() && filteredErrors.isEmpty()) {
             item {
                 Text(
@@ -674,6 +701,7 @@ private fun PageTab(
     sourceType: SourceType,
     onClearWebViewCache: () -> Unit,
     onCopy: (String, String) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val page = debugState.page
@@ -682,15 +710,13 @@ private fun PageTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            HeaderRow(title = stringResource(R.string.debug_group_page), canClear = false, onClearDebugLogs = {})
+        if (showHeader) {
+            item {
+                DebugPanelHeader(mode = DebugMode.Page, canClear = false, onClear = {})
+            }
         }
         item {
-            ButtonRow {
-                OutlinedButton(onClick = onClearWebViewCache) {
-                    Text(stringResource(R.string.debug_clear_webview_cache))
-                }
-            }
+            SectionLabel(text = "Page details")
         }
         item {
             DebugItem(
@@ -704,6 +730,14 @@ private fun PageTab(
                 ),
                 onCopy = onCopy,
             )
+        }
+        item {
+            DebugControlSection(title = "Actions") {
+                DebugActionButton(
+                    text = stringResource(R.string.debug_clear_webview_cache),
+                    onClick = onClearWebViewCache,
+                )
+            }
         }
         item {
             SectionLabel(text = "Environment")
@@ -738,6 +772,7 @@ private fun StorageTab(
     results: List<DebugStorageResult>,
     onCopy: (String, String) -> Unit,
     onOpenResult: (DebugStorageResult) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val runStorageScript: (DebugStorageSource, String) -> Unit = { source, script ->
@@ -748,33 +783,31 @@ private fun StorageTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            HeaderRow(title = stringResource(R.string.debug_group_storage), canClear = false, onClearDebugLogs = {})
-        }
-        item {
-            SectionLabel(text = stringResource(R.string.debug_tab_cookies))
-        }
-        item {
-            ButtonRow {
-                FilledTonalButton(onClick = { onReadCookies { result -> onResult(DebugStorageSource.Cookie, result) } }) {
-                    Text(stringResource(R.string.debug_read_cookies))
-                }
+        if (showHeader) {
+            item {
+                DebugPanelHeader(mode = DebugMode.Storage, canClear = false, onClear = {})
             }
         }
         item {
-            SectionLabel(text = stringResource(R.string.debug_tab_storage))
-        }
-        item {
-            ButtonRow {
-                FilledTonalButton(onClick = { runStorageScript(DebugStorageSource.LocalStorage, PageScripts.readLocalStorage()) }) {
-                    Text(stringResource(R.string.debug_read_local))
-                }
-                FilledTonalButton(onClick = { runStorageScript(DebugStorageSource.SessionStorage, PageScripts.readSessionStorage()) }) {
-                    Text(stringResource(R.string.debug_read_session))
-                }
+            DebugControlSection(title = "Actions") {
+                DebugActionButton(
+                    text = stringResource(R.string.debug_read_cookies),
+                    onClick = { onReadCookies { result -> onResult(DebugStorageSource.Cookie, result) } },
+                )
+                DebugActionButton(
+                    text = stringResource(R.string.debug_read_local),
+                    onClick = { runStorageScript(DebugStorageSource.LocalStorage, PageScripts.readLocalStorage()) },
+                )
+                DebugActionButton(
+                    text = stringResource(R.string.debug_read_session),
+                    onClick = { runStorageScript(DebugStorageSource.SessionStorage, PageScripts.readSessionStorage()) },
+                )
             }
         }
         if (results.isEmpty()) {
+            item {
+                SectionLabel(text = "Results")
+            }
             item {
                 Text(
                     text = stringResource(R.string.debug_no_callback_results),
@@ -784,6 +817,9 @@ private fun StorageTab(
                 )
             }
         } else {
+            item {
+                SectionLabel(text = "Results")
+            }
             items(results) { result ->
                 val rows = remember(result.result, result.source) {
                     parseDebugStorageRows(result.result, result.source)
@@ -807,6 +843,7 @@ private fun InspectTab(
     onResult: (String) -> Unit,
     hasResult: Boolean,
     onCopy: (String, String) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var elementSearch by remember { mutableStateOf("") }
@@ -816,10 +853,57 @@ private fun InspectTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (showHeader) {
+            item {
+                DebugPanelHeader(mode = DebugMode.Inspect, canClear = false, onClear = {})
+            }
+        }
         item {
-            HeaderRow(title = stringResource(R.string.debug_group_inspect), canClear = false, onClearDebugLogs = {})
+            DebugControlSection(title = "Inputs") {
+                OutlinedTextField(
+                    value = elementSelector,
+                    onValueChange = { elementSelector = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("CSS selector") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = elementSearch,
+                    onValueChange = { elementSearch = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search tag/id/class/text") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        item {
+            DebugControlSection(title = "Actions") {
+                DebugActionButton(
+                    text = stringResource(R.string.debug_read_source),
+                    onClick = { onEvaluateJavaScript(PageScripts.readSource(), onResult) },
+                )
+                DebugActionButton(
+                    text = stringResource(R.string.debug_read_elements),
+                    onClick = {
+                        onEvaluateJavaScript(
+                            PageScripts.readElementsSummary(search = elementSearch, selector = elementSelector),
+                            onResult,
+                        )
+                    },
+                )
+                DebugActionButton(
+                    text = "Element details",
+                    enabled = elementSelector.isNotBlank(),
+                    onClick = { onEvaluateJavaScript(PageScripts.readElementDetails(elementSelector), onResult) },
+                )
+            }
         }
         if (hasResult) {
+            item {
+                SectionLabel(text = "Results")
+            }
             item {
                 Text(
                     text = "Latest inspect result opens in full screen.",
@@ -827,53 +911,6 @@ private fun InspectTab(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        item {
-            ButtonRow {
-                FilledTonalButton(onClick = { onEvaluateJavaScript(PageScripts.readSource(), onResult) }) {
-                    Text(stringResource(R.string.debug_read_source))
-                }
-                OutlinedButton(
-                    onClick = {
-                        onEvaluateJavaScript(
-                            PageScripts.readElementsSummary(search = elementSearch, selector = elementSelector),
-                            onResult,
-                        )
-                    },
-                ) {
-                    Text(stringResource(R.string.debug_read_elements))
-                }
-            }
-        }
-        item {
-            ButtonRow {
-                OutlinedButton(
-                    enabled = elementSelector.isNotBlank(),
-                    onClick = { onEvaluateJavaScript(PageScripts.readElementDetails(elementSelector), onResult) },
-                ) {
-                    Text("Element details")
-                }
-            }
-        }
-        item {
-            OutlinedTextField(
-                value = elementSelector,
-                onValueChange = { elementSelector = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("CSS selector") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
-        }
-        item {
-            OutlinedTextField(
-                value = elementSearch,
-                onValueChange = { elementSearch = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search tag/id/class/text") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }
@@ -886,6 +923,7 @@ private fun JsExecTab(
     onResult: (String) -> Unit,
     onCopy: (String, String) -> Unit,
     onClearDebug: (DebugClearScope) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var script by remember { mutableStateOf("") }
@@ -895,15 +933,18 @@ private fun JsExecTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            HeaderRow(title = stringResource(R.string.debug_group_execute), canClear = false, onClearDebugLogs = {})
+        if (showHeader) {
+            item {
+                DebugPanelHeader(mode = DebugMode.Execute, canClear = false, onClear = {})
+            }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DebugControlSection(title = "Inputs") {
                 Box {
-                    OutlinedButton(onClick = { templatesExpanded = true }) {
-                        Text("Templates")
-                    }
+                    DebugActionButton(
+                        text = "Templates",
+                        onClick = { templatesExpanded = true },
+                    )
                     DropdownMenu(
                         expanded = templatesExpanded,
                         onDismissRequest = { templatesExpanded = false },
@@ -934,17 +975,26 @@ private fun JsExecTab(
                     minLines = 3,
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
-                Button(
+            }
+        }
+        item {
+            DebugControlSection(title = "Actions") {
+                DebugActionButton(
+                    text = stringResource(R.string.debug_execute),
                     enabled = script.isNotBlank(),
                     onClick = {
                         onEvaluateJavaScript(PageScripts.executeUserScript(script), onResult)
                     },
-                ) {
-                    Text(stringResource(R.string.debug_execute))
-                }
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.JS) }) {
-                    Text("Clear JS results")
-                }
+                )
+                DebugActionButton(
+                    text = "Clear JS results",
+                    onClick = { onClearDebug(DebugClearScope.JS) },
+                )
+            }
+        }
+        if (jsResults.isNotEmpty() || callbackResults.isNotEmpty()) {
+            item {
+                SectionLabel(text = "Results")
             }
         }
         if (jsResults.isNotEmpty()) {
@@ -959,7 +1009,7 @@ private fun JsExecTab(
                 )
             }
         }
-        resultItems(callbackResults, onCopy)
+        resultItems(callbackResults, onCopy, showEmpty = jsResults.isEmpty())
     }
 }
 
@@ -973,6 +1023,7 @@ private fun NetworkTab(
     onCopy: (String, String) -> Unit,
     onOpenRequest: (RequestSnapshot) -> Unit,
     onOpenDownload: (DownloadSnapshot) -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -999,40 +1050,33 @@ private fun NetworkTab(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            HeaderRow(
-                title = stringResource(R.string.debug_group_network),
+        if (showHeader) {
+            item {
+            DebugPanelHeader(
+                mode = DebugMode.Network,
                 canClear = requests.isNotEmpty() || downloads.isNotEmpty(),
-                onClearDebugLogs = onClearDebugLogs,
+                onClear = onClearDebugLogs,
             )
-        }
-        item {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search network") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
-        }
-        item {
-            FilterRow {
-                FilterChip(selected = !mainFrameOnly, onClick = { mainFrameOnly = false }, label = { Text("All") })
-                FilterChip(selected = mainFrameOnly, onClick = { mainFrameOnly = true }, label = { Text("Main frame") })
             }
         }
         item {
-            ButtonRow {
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.NETWORK) }) {
-                    Text("Clear network")
-                }
-                OutlinedButton(onClick = { onClearDebug(DebugClearScope.CURRENT_NAVIGATION) }) {
-                    Text("Clear current nav")
-                }
+            DebugControlSection(title = "Filters") {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search network") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+                DropdownFilter(
+                    label = "Frame",
+                    selectedLabel = if (mainFrameOnly) "Main frame" else "All",
+                    options = listOf("All" to false, "Main frame" to true),
+                    onSelected = { mainFrameOnly = it },
+                )
             }
         }
-
         if (requests.isNotEmpty()) {
             item {
                 DebugItem(
@@ -1113,8 +1157,9 @@ private fun NetworkTab(
 private fun androidx.compose.foundation.lazy.LazyListScope.resultItems(
     results: List<String>,
     onCopy: (String, String) -> Unit,
+    showEmpty: Boolean = true,
 ) {
-    if (results.isEmpty()) {
+    if (results.isEmpty() && showEmpty) {
         item {
             Text(
                 text = stringResource(R.string.debug_no_callback_results),
@@ -1158,10 +1203,10 @@ private fun formatCallbackResult(result: String): List<String> =
     }
 
 @Composable
-private fun HeaderRow(
-    title: String,
+private fun DebugPanelHeader(
+    mode: DebugMode,
     canClear: Boolean,
-    onClearDebugLogs: () -> Unit,
+    onClear: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1169,18 +1214,24 @@ private fun HeaderRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = title,
+            text = mode.title(),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
         if (canClear) {
-            IconButton(onClick = onClearDebugLogs) {
+            IconButton(onClick = onClear) {
                 Icon(
                     Icons.Outlined.DeleteSweep,
                     contentDescription = stringResource(R.string.action_clear),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        } else {
+            Box(
+                modifier = Modifier
+                    .width(48.dp)
+                    .heightIn(min = 48.dp),
+            )
         }
     }
 }
@@ -1196,6 +1247,43 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
+private fun DebugControlSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SectionLabel(text = title)
+        content()
+    }
+}
+
+@Composable
+private fun DebugActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp),
+    ) {
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun ButtonRow(content: @Composable RowScope.() -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1206,13 +1294,47 @@ private fun ButtonRow(content: @Composable RowScope.() -> Unit) {
 }
 
 @Composable
-private fun FilterRow(content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content,
-    )
+private fun <T> DropdownFilter(
+    label: String,
+    selectedLabel: String,
+    options: List<Pair<String, T>>,
+    onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = "$label: $selectedLabel",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { (optionLabel, optionValue) ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = optionLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    onClick = {
+                        onSelected(optionValue)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1304,16 +1426,7 @@ internal enum class DebugMode(@get:StringRes val labelRes: Int, val icon: ImageV
 }
 
 internal fun DebugMode.label(state: DebugState): String {
-    val base = when (this) {
-        DebugMode.Overview -> "Overview"
-        DebugMode.Timeline -> "Timeline"
-        DebugMode.Logs -> "Logs"
-        DebugMode.Page -> "Page"
-        DebugMode.Storage -> "Storage"
-        DebugMode.Inspect -> "Inspect"
-        DebugMode.Network -> "Network"
-        DebugMode.Execute -> "Execute"
-    }
+    val base = title()
     val count = when (this) {
         DebugMode.Overview -> state.timeline.count { it.severity != DebugSeverity.INFO }
         DebugMode.Timeline -> state.timeline.size
@@ -1326,6 +1439,18 @@ internal fun DebugMode.label(state: DebugState): String {
     }
     return if (count > 0) "$base $count" else base
 }
+
+private fun DebugMode.title(): String =
+    when (this) {
+        DebugMode.Overview -> "Overview"
+        DebugMode.Timeline -> "Timeline"
+        DebugMode.Logs -> "Logs"
+        DebugMode.Page -> "Page"
+        DebugMode.Storage -> "Storage"
+        DebugMode.Inspect -> "Inspect"
+        DebugMode.Network -> "Network"
+        DebugMode.Execute -> "Execute"
+    }
 
 private fun formatTime(timestamp: Long): String {
     if (timestamp <= 0L) return "-"
