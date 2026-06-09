@@ -190,7 +190,12 @@ object PageScripts {
         )
     }
 
-    fun startFloatingInspectPointer(): String = wrap(
+    fun startFloatingInspectPointer(
+        ariaLabel: String = "WebView inspect pointer",
+        confirmLabel: String = "Confirm",
+        cancelLabel: String = "Cancel",
+        noElementLabel: String = "No element",
+    ): String = wrap(
         """
         const existing = window.__wvDebugInspect;
         if (existing && typeof existing.cleanup === "function") {
@@ -211,7 +216,7 @@ object PageScripts {
         const cancelButton = document.createElement("button");
 
         overlay.id = "__wv_debug_inspect_pointer";
-        overlay.setAttribute("aria-label", "WebView inspect pointer");
+        overlay.setAttribute("aria-label", ${ariaLabel.toJsonStringLiteral()});
         overlay.style.cssText = [
           "position:fixed",
           "left:" + state.x + "px",
@@ -294,14 +299,14 @@ object PageScripts {
           "touch-action:manipulation"
         ].join(";");
         confirmButton.type = "button";
-        confirmButton.textContent = "Confirm";
+        confirmButton.textContent = ${confirmLabel.toJsonStringLiteral()};
         confirmButton.style.cssText = buttonStyle;
         cancelButton.type = "button";
-        cancelButton.textContent = "Cancel";
+        cancelButton.textContent = ${cancelLabel.toJsonStringLiteral()};
         cancelButton.style.cssText = buttonStyle + ";background:#e5e7eb";
 
         const labelFor = (element) => {
-          if (!element || !element.tagName) return "No element";
+          if (!element || !element.tagName) return ${noElementLabel.toJsonStringLiteral()};
           const id = element.id ? "#" + element.id : "";
           const className = (element.getAttribute("class") || "")
             .trim()

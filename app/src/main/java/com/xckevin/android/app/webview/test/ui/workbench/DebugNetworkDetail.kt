@@ -24,11 +24,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.debug.DownloadSnapshot
 import com.xckevin.android.app.webview.test.debug.DebugNetworkContentFormatter
 import com.xckevin.android.app.webview.test.debug.PageError
@@ -51,12 +54,14 @@ fun DebugNetworkDetailScreen(
         error = error,
         download = download,
     )
-    val title = when {
-        download != null -> "Download detail"
-        request != null -> "Request detail"
-        error != null -> "Response detail"
-        else -> "Network detail"
-    }
+    val title = stringResource(
+        when {
+            download != null -> R.string.debug_download_detail
+            request != null -> R.string.debug_request_detail
+            error != null -> R.string.debug_response_detail
+            else -> R.string.debug_network_detail
+        },
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -70,7 +75,7 @@ fun DebugNetworkDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Close")
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_close))
                     }
                 },
                 actions = {
@@ -83,7 +88,7 @@ fun DebugNetworkDetailScreen(
                         },
                         enabled = sections.isNotEmpty(),
                     ) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy")
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.action_copy))
                     }
                 },
             )
@@ -99,7 +104,7 @@ fun DebugNetworkDetailScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = "No network item selected",
+                    text = stringResource(R.string.debug_no_network_item_selected),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -165,7 +170,7 @@ private fun SectionHeader(section: NetworkDetailSection) {
             tint = MaterialTheme.colorScheme.primary,
         )
         Text(
-            text = section.title,
+            text = section.titleText(),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -177,7 +182,7 @@ private fun DetailRow(row: NetworkDetailRow) {
     ListItem(
         headlineContent = {
             Text(
-                text = row.label,
+                text = row.labelText(),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -192,6 +197,67 @@ private fun DetailRow(row: NetworkDetailRow) {
     )
     HorizontalDivider()
 }
+
+@Composable
+private fun NetworkDetailSection.titleText(): String =
+    stringResource(kind.titleRes())
+
+@StringRes
+private fun NetworkDetailSectionKind.titleRes(): Int =
+    when (this) {
+        NetworkDetailSectionKind.Url -> R.string.debug_network_section_url
+        NetworkDetailSectionKind.RequestHeaders -> R.string.debug_network_section_request_headers
+        NetworkDetailSectionKind.RequestBody -> R.string.debug_network_section_request_body
+        NetworkDetailSectionKind.ResponseHeaders -> R.string.debug_network_section_response_headers
+        NetworkDetailSectionKind.ResponseBody -> R.string.debug_network_section_response_body
+        NetworkDetailSectionKind.MediaPreview -> R.string.debug_network_section_media_preview
+        NetworkDetailSectionKind.Meta -> R.string.debug_network_section_meta
+        NetworkDetailSectionKind.Request -> R.string.debug_request_detail
+        NetworkDetailSectionKind.Response -> R.string.debug_response_detail
+        NetworkDetailSectionKind.Download -> R.string.debug_network_section_download
+    }
+
+@Composable
+private fun NetworkDetailRow.labelText(): String =
+    when (label) {
+        "Request URL" -> stringResource(R.string.debug_request_url)
+        "Response URL" -> stringResource(R.string.debug_response_url)
+        "Download URL" -> stringResource(R.string.debug_download_url)
+        "URL" -> stringResource(R.string.debug_network_section_url)
+        "Method" -> stringResource(R.string.debug_method)
+        "Scheme" -> stringResource(R.string.debug_scheme)
+        "Host" -> stringResource(R.string.debug_host)
+        "Path" -> stringResource(R.string.debug_path)
+        "Main frame" -> stringResource(R.string.debug_main_frame)
+        "Category" -> stringResource(R.string.debug_category)
+        "Navigation ID" -> stringResource(R.string.debug_navigation_id)
+        "Request timestamp" -> stringResource(R.string.debug_request_timestamp)
+        "Status code" -> stringResource(R.string.debug_status_code)
+        "Reason/message" -> stringResource(R.string.debug_reason_message)
+        "Response main frame" -> stringResource(R.string.debug_response_main_frame)
+        "Response navigation ID" -> stringResource(R.string.debug_response_navigation_id)
+        "Response timestamp" -> stringResource(R.string.debug_response_timestamp)
+        "Timestamp" -> stringResource(R.string.debug_timestamp)
+        "User agent" -> stringResource(R.string.debug_user_agent)
+        "Content disposition" -> stringResource(R.string.debug_content_disposition)
+        "MIME type" -> stringResource(R.string.debug_mime_type)
+        "Content length" -> stringResource(R.string.debug_content_length)
+        "Download ID" -> stringResource(R.string.debug_download_id)
+        "File name" -> stringResource(R.string.debug_file_name)
+        "Status" -> stringResource(R.string.debug_status)
+        "Reason" -> stringResource(R.string.debug_reason)
+        "Local URI" -> stringResource(R.string.debug_local_uri)
+        "Updated at" -> stringResource(R.string.debug_updated_at)
+        "Headers" -> stringResource(R.string.debug_headers)
+        "Body" -> stringResource(R.string.debug_body)
+        "Type" -> stringResource(R.string.debug_type)
+        "Truncated" -> stringResource(R.string.debug_truncated)
+        "Kind" -> stringResource(R.string.debug_kind)
+        "Preview URL" -> stringResource(R.string.debug_preview_url)
+        "Preview local URI" -> stringResource(R.string.debug_preview_local_uri)
+        "Meta" -> stringResource(R.string.debug_network_section_meta)
+        else -> label
+    }
 
 data class NetworkDetailSection(
     val title: String,

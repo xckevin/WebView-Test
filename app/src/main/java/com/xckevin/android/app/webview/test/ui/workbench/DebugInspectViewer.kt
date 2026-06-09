@@ -36,10 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xckevin.android.app.webview.test.R
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -301,11 +303,11 @@ private fun DebugInspectTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.Outlined.Close, contentDescription = "Close")
+            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_close))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Inspect result",
+                text = stringResource(R.string.debug_inspect_result),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -320,7 +322,7 @@ private fun DebugInspectTopBar(
             )
         }
         IconButton(onClick = onCopy) {
-            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy all")
+            Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.action_copy_all))
         }
     }
 }
@@ -348,17 +350,23 @@ private fun TreeInspectContent(
                 enabled = selectedIndex > 0,
                 onClick = { selectedIndex = (selectedIndex - 1).coerceAtLeast(0) },
             ) {
-                Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Select parent node")
+                Icon(
+                    Icons.Outlined.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.debug_select_parent_node),
+                )
             }
             IconButton(
                 enabled = selectedIndex < result.path.lastIndex,
                 onClick = { selectedIndex = (selectedIndex + 1).coerceAtMost(result.path.lastIndex) },
             ) {
-                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Select child node")
+                Icon(
+                    Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.debug_select_child_node),
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = selectedElement?.label() ?: "No element selected",
+                    text = selectedElement?.label() ?: stringResource(R.string.debug_no_element_selected),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -366,8 +374,17 @@ private fun TreeInspectContent(
                 )
                 Text(
                     text = buildString {
-                        append("Node ${selectedIndex + 1} of ${result.path.size}")
-                        if (result.truncatedAncestors) append(" · ancestors truncated")
+                        append(
+                            stringResource(
+                                R.string.debug_node_position,
+                                selectedIndex + 1,
+                                result.path.size,
+                            ),
+                        )
+                        if (result.truncatedAncestors) {
+                            append(" · ")
+                            append(stringResource(R.string.debug_ancestors_truncated))
+                        }
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -393,7 +410,7 @@ private fun TreeInspectContent(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Text(
-                                text = "Selected node",
+                                text = stringResource(R.string.debug_selected_node),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold,
@@ -405,7 +422,7 @@ private fun TreeInspectContent(
             }
             item {
                 Text(
-                    text = "Element path",
+                    text = stringResource(R.string.debug_element_path),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -446,15 +463,18 @@ private fun TreeElementRow(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
-                text = "${"  ".repeat(depth)}${element.label().ifBlank { "(unknown element)" }}",
+                text = "${"  ".repeat(depth)}${
+                    element.label().ifBlank { stringResource(R.string.debug_unknown_element) }
+                }",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
             )
             Text(
                 text = buildString {
-                    append("child ${element.childIndex + 1}")
-                    append(" · ${element.childCount} children")
+                    append(stringResource(R.string.debug_child_position, element.childIndex + 1))
+                    append(" · ")
+                    append(stringResource(R.string.debug_children_count, element.childCount))
                     element.text.ifBlank { element.href.ifBlank { element.src } }.takeIf { it.isNotBlank() }?.let {
                         append(" · ")
                         append(it)
@@ -548,7 +568,15 @@ private fun ElementRow(
             }
             AssistChip(
                 onClick = onToggle,
-                label = { Text(if (element.visible == false) "hidden" else "visible") },
+                label = {
+                    Text(
+                        if (element.visible == false) {
+                            stringResource(R.string.debug_hidden)
+                        } else {
+                            stringResource(R.string.debug_visible)
+                        },
+                    )
+                },
             )
         }
         if (expanded) {
@@ -646,7 +674,7 @@ private fun SearchField(
         leadingIcon = {
             Icon(Icons.Outlined.Search, contentDescription = null)
         },
-        placeholder = { Text("Search") },
+        placeholder = { Text(stringResource(R.string.action_search)) },
     )
 }
 
@@ -697,7 +725,7 @@ private fun DebugInspectResult.subtitle(): String =
         is DebugInspectResult.PlainText -> "Text result"
     }
 
-private fun DebugInspectElement.label(): String =
+internal fun DebugInspectElement.label(): String =
     buildString {
         append(tag)
         if (id.isNotBlank()) append("#").append(id)

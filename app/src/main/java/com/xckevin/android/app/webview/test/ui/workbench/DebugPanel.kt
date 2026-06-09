@@ -398,6 +398,7 @@ private fun OverviewTab(
     modifier: Modifier = Modifier,
 ) {
     val page = debugState.page
+    val debugBundleTitle = stringResource(R.string.debug_share_bundle_title)
     val errorCount = debugState.errors.size
     val warningCount = debugState.timeline.count { it.severity == DebugSeverity.WARNING }
     val requestCount = debugState.requests.size
@@ -421,13 +422,13 @@ private fun OverviewTab(
         }
         item {
             val bundle = debugState.toDebugBundle(config, sourceType)
-            DebugControlSection(title = "Actions") {
+            DebugControlSection(title = stringResource(R.string.debug_section_actions)) {
                 ButtonRow {
                     FilledTonalButton(onClick = { onCopy("debug-bundle", bundle) }) {
-                        Text("Copy debug bundle")
+                        Text(stringResource(R.string.debug_copy_bundle))
                     }
-                    OutlinedButton(onClick = { onShare("WebViewTest debug bundle", bundle) }) {
-                        Text("Share")
+                    OutlinedButton(onClick = { onShare(debugBundleTitle, bundle) }) {
+                        Text(stringResource(R.string.action_share))
                     }
                 }
             }
@@ -437,53 +438,67 @@ private fun OverviewTab(
                 title = page.url ?: stringResource(R.string.debug_no_page_loaded),
                 subtitle = stringResource(R.string.debug_status_label, page.status),
                 details = listOf(
-                    "Title: ${page.title.ifBlank { "-" }}",
-                    "Progress: ${page.progress}%",
-                    "Navigation: ${page.navigationId}",
-                    "Updated: ${formatTime(page.timestamp)}",
+                    stringResource(R.string.debug_title_label, page.title.ifBlank { "-" }),
+                    stringResource(R.string.debug_progress_percent_label, page.progress),
+                    stringResource(R.string.debug_navigation_label, page.navigationId),
+                    stringResource(R.string.debug_updated_label, formatTime(page.timestamp)),
                 ),
                 onCopy = onCopy,
             )
         }
         item {
-            SectionLabel(text = "Signals")
+            SectionLabel(text = stringResource(R.string.debug_section_signals))
         }
         item {
             DebugItem(
-                title = if (errorCount == 0 && warningCount == 0) "No blocking debug signals" else "$errorCount errors, $warningCount warnings",
-                subtitle = "Console ${debugState.consoleLogs.size} · Network $requestCount · Downloads ${debugState.downloads.size}",
+                title = if (errorCount == 0 && warningCount == 0) {
+                    stringResource(R.string.debug_no_blocking_signals)
+                } else {
+                    stringResource(R.string.debug_signal_problem_counts, errorCount, warningCount)
+                },
+                subtitle = stringResource(
+                    R.string.debug_signal_counts,
+                    debugState.consoleLogs.size,
+                    requestCount,
+                    debugState.downloads.size,
+                ),
                 accentColor = when {
                     errorCount > 0 -> Red500
                     warningCount > 0 || failedDownloads > 0 -> Color(0xFFF59E0B)
                     else -> null
                 },
                 details = listOf(
-                    "JS results: ${debugState.jsResults.size}",
-                    "User flows: ${debugState.userFlows.size}",
-                    "Timeline events: ${debugState.timeline.size}",
-                    "Failed/skipped downloads: $failedDownloads",
+                    stringResource(R.string.debug_js_results_count, debugState.jsResults.size),
+                    stringResource(R.string.debug_user_flows_count, debugState.userFlows.size),
+                    stringResource(R.string.debug_timeline_events_count, debugState.timeline.size),
+                    stringResource(R.string.debug_failed_downloads_count, failedDownloads),
                 ),
                 onCopy = onCopy,
             )
         }
         item {
-            SectionLabel(text = "Environment")
+            SectionLabel(text = stringResource(R.string.debug_section_environment))
         }
         item {
             DebugItem(
-                title = "Current WebView environment",
-                subtitle = "Source type: $sourceType",
+                title = stringResource(R.string.debug_current_webview_environment),
+                subtitle = stringResource(R.string.debug_source_type_label, sourceType),
                 details = listOf(
-                    "JavaScript: ${config.javaScriptEnabled}",
-                    "DOM storage: ${config.domStorageEnabled}",
-                    "Desktop mode: ${config.desktopMode}",
-                    "User agent mode: ${config.userAgentMode}",
-                    "Cache mode: ${config.cacheMode}",
-                    "Mixed content: ${config.mixedContentMode}",
-                    "Cookies: ${config.cookiesEnabled}",
-                    "Third-party cookies: ${config.thirdPartyCookiesEnabled}",
-                    "Permissions: camera=${config.cameraPolicy}, microphone=${config.microphonePolicy}, geolocation=${config.geolocationPolicy}",
-                    "Chrome remote inspect: controlled by Settings, release default is disabled",
+                    stringResource(R.string.debug_javascript_enabled_label, config.javaScriptEnabled),
+                    stringResource(R.string.debug_dom_storage_enabled_label, config.domStorageEnabled),
+                    stringResource(R.string.debug_desktop_mode_enabled_label, config.desktopMode),
+                    stringResource(R.string.debug_user_agent_mode_value_label, config.userAgentMode),
+                    stringResource(R.string.debug_cache_mode_value_label, config.cacheMode),
+                    stringResource(R.string.debug_mixed_content_value_label, config.mixedContentMode),
+                    stringResource(R.string.debug_cookies_enabled_label, config.cookiesEnabled),
+                    stringResource(R.string.debug_third_party_cookies_enabled_label, config.thirdPartyCookiesEnabled),
+                    stringResource(
+                        R.string.debug_permissions_config_label,
+                        config.cameraPolicy,
+                        config.microphonePolicy,
+                        config.geolocationPolicy,
+                    ),
+                    stringResource(R.string.debug_chrome_remote_inspect_note),
                 ),
                 onCopy = onCopy,
             )
@@ -494,7 +509,7 @@ private fun OverviewTab(
             .asReversed()
         if (latestProblems.isNotEmpty()) {
             item {
-                SectionLabel(text = "Latest problems")
+                SectionLabel(text = stringResource(R.string.debug_latest_problems))
             }
             items(latestProblems) { event ->
                 DebugItem(
@@ -543,12 +558,12 @@ private fun TimelineTab(
             }
         }
         item {
-            DebugControlSection(title = "Filters") {
+            DebugControlSection(title = stringResource(R.string.debug_section_filters)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search timeline") },
+                    label = { Text(stringResource(R.string.debug_search_timeline)) },
                     leadingIcon = {
                         Icon(Icons.Outlined.FilterList, contentDescription = null)
                     },
@@ -556,26 +571,26 @@ private fun TimelineTab(
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
                 DropdownFilter(
-                    label = "Severity",
-                    selectedLabel = severity?.name ?: "All",
-                    options = listOf<Pair<String, DebugSeverity?>>("All" to null) +
+                    label = stringResource(R.string.debug_severity),
+                    selectedLabel = severity?.name ?: stringResource(R.string.debug_all),
+                    options = listOf<Pair<String, DebugSeverity?>>(stringResource(R.string.debug_all) to null) +
                         DebugSeverity.entries.map { it.name to it },
                     onSelected = { severity = it },
                 )
                 DropdownFilter(
-                    label = "Event type",
-                    selectedLabel = type?.name?.lowercase() ?: "Any type",
-                    options = listOf<Pair<String, DebugEventType?>>("Any type" to null) +
+                    label = stringResource(R.string.debug_event_type),
+                    selectedLabel = type?.name?.lowercase() ?: stringResource(R.string.debug_any_type),
+                    options = listOf<Pair<String, DebugEventType?>>(stringResource(R.string.debug_any_type) to null) +
                         DebugEventType.entries.map { it.name.lowercase() to it },
                     onSelected = { type = it },
                 )
             }
         }
         item {
-            DebugControlSection(title = "Actions") {
+            DebugControlSection(title = stringResource(R.string.debug_section_actions)) {
                 ButtonRow {
                     OutlinedButton(onClick = { onCopy("debug-timeline", filtered.joinToString("\n") { it.copyText() }) }) {
-                        Text("Copy filtered")
+                        Text(stringResource(R.string.action_copy_filtered))
                     }
                 }
             }
@@ -583,7 +598,7 @@ private fun TimelineTab(
         if (filtered.isEmpty()) {
             item {
                 Text(
-                    text = "No timeline events",
+                    text = stringResource(R.string.debug_no_timeline_events),
                     modifier = Modifier.padding(vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -595,7 +610,9 @@ private fun TimelineTab(
                     title = event.summary,
                     subtitle = "${event.type} · ${event.severity} · ${formatTime(event.timestamp)}",
                     accentColor = event.severity.color(),
-                    details = listOf("Navigation: ${event.navigationId}") + event.details + event.diagnosticHint(),
+                    details = listOf(stringResource(R.string.debug_navigation_label, event.navigationId)) +
+                        event.details +
+                        event.diagnosticHint(),
                     onCopy = onCopy,
                 )
             }
@@ -640,19 +657,19 @@ private fun LogsTab(
             }
         }
         item {
-            DebugControlSection(title = "Filters") {
+            DebugControlSection(title = stringResource(R.string.debug_section_filters)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search logs") },
+                    label = { Text(stringResource(R.string.debug_search_logs)) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
                 DropdownFilter(
-                    label = "Level",
-                    selectedLabel = level ?: "All",
-                    options = listOf<Pair<String, String?>>("All" to null) +
+                    label = stringResource(R.string.debug_level),
+                    selectedLabel = level ?: stringResource(R.string.debug_all),
+                    options = listOf<Pair<String, String?>>(stringResource(R.string.debug_all) to null) +
                         listOf("ERROR", "WARNING", "WARN", "LOG", "INFO").map { it to it },
                     onSelected = { level = it },
                 )
@@ -739,7 +756,7 @@ private fun PageTab(
             }
         }
         item {
-            SectionLabel(text = "Page details")
+            SectionLabel(text = stringResource(R.string.debug_page_details))
         }
         item {
             DebugItem(
@@ -755,7 +772,7 @@ private fun PageTab(
             )
         }
         item {
-            DebugControlSection(title = "Actions") {
+            DebugControlSection(title = stringResource(R.string.debug_section_actions)) {
                 DebugActionButton(
                     text = stringResource(R.string.debug_clear_webview_cache),
                     onClick = onClearWebViewCache,
@@ -763,23 +780,28 @@ private fun PageTab(
             }
         }
         item {
-            SectionLabel(text = "Environment")
+            SectionLabel(text = stringResource(R.string.debug_section_environment))
         }
         item {
             DebugItem(
-                title = "Current WebView environment",
+                title = stringResource(R.string.debug_current_webview_environment),
                 subtitle = "",
                 details = listOf(
-                    "Source type: $sourceType",
-                    "JavaScript: ${config.javaScriptEnabled}",
-                    "DOM storage: ${config.domStorageEnabled}",
-                    "Desktop mode: ${config.desktopMode}",
-                    "User agent mode: ${config.userAgentMode}",
-                    "Cache mode: ${config.cacheMode}",
-                    "Mixed content: ${config.mixedContentMode}",
-                    "Cookies: ${config.cookiesEnabled}",
-                    "Third-party cookies: ${config.thirdPartyCookiesEnabled}",
-                    "Permissions: camera=${config.cameraPolicy}, microphone=${config.microphonePolicy}, geolocation=${config.geolocationPolicy}",
+                    stringResource(R.string.debug_source_type_label, sourceType),
+                    stringResource(R.string.debug_javascript_enabled_label, config.javaScriptEnabled),
+                    stringResource(R.string.debug_dom_storage_enabled_label, config.domStorageEnabled),
+                    stringResource(R.string.debug_desktop_mode_enabled_label, config.desktopMode),
+                    stringResource(R.string.debug_user_agent_mode_value_label, config.userAgentMode),
+                    stringResource(R.string.debug_cache_mode_value_label, config.cacheMode),
+                    stringResource(R.string.debug_mixed_content_value_label, config.mixedContentMode),
+                    stringResource(R.string.debug_cookies_enabled_label, config.cookiesEnabled),
+                    stringResource(R.string.debug_third_party_cookies_enabled_label, config.thirdPartyCookiesEnabled),
+                    stringResource(
+                        R.string.debug_permissions_config_label,
+                        config.cameraPolicy,
+                        config.microphonePolicy,
+                        config.geolocationPolicy,
+                    ),
                 ),
                 onCopy = onCopy,
             )
@@ -812,7 +834,7 @@ private fun StorageTab(
             }
         }
         item {
-            DebugControlSection(title = "Actions") {
+            DebugControlSection(title = stringResource(R.string.debug_section_actions)) {
                 DebugActionButton(
                     text = stringResource(R.string.debug_read_cookies),
                     onClick = { onReadCookies { result -> onResult(DebugStorageSource.Cookie, result) } },
@@ -829,7 +851,7 @@ private fun StorageTab(
         }
         if (results.isEmpty()) {
             item {
-                SectionLabel(text = "Results")
+                SectionLabel(text = stringResource(R.string.debug_section_results))
             }
             item {
                 Text(
@@ -841,17 +863,21 @@ private fun StorageTab(
             }
         } else {
             item {
-                SectionLabel(text = "Results")
+                SectionLabel(text = stringResource(R.string.debug_section_results))
             }
             items(results) { result ->
                 val rows = remember(result.result, result.source) {
                     parseDebugStorageRows(result.result, result.source)
                 }
                 DebugItem(
-                    title = "${result.source.label} table",
-                    subtitle = "${rows.size} rows · tap to open table viewer",
+                    title = stringResource(R.string.debug_storage_table_title, result.source.label),
+                    subtitle = stringResource(R.string.debug_storage_table_summary, rows.size),
                     details = rows.take(5).map { "${it.key} = ${it.value}" } +
-                        if (rows.size > 5) listOf("... ${rows.size - 5} more") else emptyList(),
+                        if (rows.size > 5) {
+                            listOf(stringResource(R.string.debug_more_rows, rows.size - 5))
+                        } else {
+                            emptyList()
+                        },
                     onCopy = onCopy,
                     onClick = { onOpenResult(result) },
                 )
@@ -873,6 +899,11 @@ private fun InspectTab(
     var elementSearch by remember { mutableStateOf("") }
     var elementSelector by remember { mutableStateOf("") }
     var pointerMessage by remember { mutableStateOf<String?>(null) }
+    val pointerStartedMessage = stringResource(R.string.debug_pointer_started)
+    val inspectPointerAriaLabel = stringResource(R.string.debug_inspect_pointer)
+    val confirmLabel = stringResource(R.string.debug_confirm)
+    val cancelLabel = stringResource(R.string.action_cancel)
+    val noElementLabel = stringResource(R.string.debug_no_element)
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(12.dp),
@@ -884,12 +915,12 @@ private fun InspectTab(
             }
         }
         item {
-            DebugControlSection(title = "Inputs") {
+            DebugControlSection(title = stringResource(R.string.debug_section_inputs)) {
                 OutlinedTextField(
                     value = elementSelector,
                     onValueChange = { elementSelector = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("CSS selector") },
+                    label = { Text(stringResource(R.string.debug_css_selector)) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
@@ -897,25 +928,32 @@ private fun InspectTab(
                     value = elementSearch,
                     onValueChange = { elementSearch = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search tag/id/class/text") },
+                    label = { Text(stringResource(R.string.debug_search_element_hint)) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
             }
         }
         item {
-            DebugControlSection(title = "Floating pointer") {
+            DebugControlSection(title = stringResource(R.string.debug_floating_pointer)) {
                 DebugActionButton(
-                    text = "Start pointer overlay",
+                    text = stringResource(R.string.debug_start_pointer_overlay),
                     onClick = {
-                        onEvaluateJavaScript(PageScripts.startFloatingInspectPointer()) {
-                            pointerMessage = "Use the page overlay to move, confirm, or cancel."
+                        onEvaluateJavaScript(
+                            PageScripts.startFloatingInspectPointer(
+                                ariaLabel = inspectPointerAriaLabel,
+                                confirmLabel = confirmLabel,
+                                cancelLabel = cancelLabel,
+                                noElementLabel = noElementLabel,
+                            ),
+                        ) {
+                            pointerMessage = pointerStartedMessage
                             onInspectPointerStarted()
                         }
                     },
                 )
                 Text(
-                    text = "Tap or drag on the page to move the pointer. Confirm and Cancel are on the page overlay.",
+                    text = stringResource(R.string.debug_pointer_help),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -931,7 +969,7 @@ private fun InspectTab(
             }
         }
         item {
-            DebugControlSection(title = "Actions") {
+            DebugControlSection(title = stringResource(R.string.debug_section_actions)) {
                 DebugActionButton(
                     text = stringResource(R.string.debug_read_source),
                     onClick = { onEvaluateJavaScript(PageScripts.readSource(), onResult) },
@@ -946,7 +984,7 @@ private fun InspectTab(
                     },
                 )
                 DebugActionButton(
-                    text = "Element details",
+                    text = stringResource(R.string.debug_element_details),
                     enabled = elementSelector.isNotBlank(),
                     onClick = { onEvaluateJavaScript(PageScripts.readElementDetails(elementSelector), onResult) },
                 )
@@ -954,11 +992,11 @@ private fun InspectTab(
         }
         if (hasResult) {
             item {
-                SectionLabel(text = "Results")
+                SectionLabel(text = stringResource(R.string.debug_section_results))
             }
             item {
                 Text(
-                    text = "Latest inspect result opens in full screen.",
+                    text = stringResource(R.string.debug_latest_inspect_result_opens_full_screen),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -991,10 +1029,10 @@ private fun JsExecTab(
             }
         }
         item {
-            DebugControlSection(title = "Inputs") {
+            DebugControlSection(title = stringResource(R.string.debug_section_inputs)) {
                 Box {
                     DebugActionButton(
-                        text = "Templates",
+                        text = stringResource(R.string.debug_templates),
                         onClick = { templatesExpanded = true },
                     )
                     DropdownMenu(
@@ -1030,7 +1068,7 @@ private fun JsExecTab(
             }
         }
         item {
-            DebugControlSection(title = "Actions") {
+            DebugControlSection(title = stringResource(R.string.debug_section_actions)) {
                 DebugActionButton(
                     text = stringResource(R.string.debug_execute),
                     enabled = script.isNotBlank(),
@@ -1039,14 +1077,14 @@ private fun JsExecTab(
                     },
                 )
                 DebugActionButton(
-                    text = "Clear JS results",
+                    text = stringResource(R.string.debug_clear_js_results),
                     onClick = { onClearDebug(DebugClearScope.JS) },
                 )
             }
         }
         if (jsResults.isNotEmpty() || callbackResults.isNotEmpty()) {
             item {
-                SectionLabel(text = "Results")
+                SectionLabel(text = stringResource(R.string.debug_section_results))
             }
         }
         if (jsResults.isNotEmpty()) {
@@ -1120,19 +1158,26 @@ private fun NetworkTab(
             }
         }
         item {
-            DebugControlSection(title = "Filters") {
+            DebugControlSection(title = stringResource(R.string.debug_section_filters)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search network") },
+                    label = { Text(stringResource(R.string.debug_search_network)) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
                 DropdownFilter(
-                    label = "Frame",
-                    selectedLabel = if (mainFrameOnly) "Main frame" else "All",
-                    options = listOf("All" to false, "Main frame" to true),
+                    label = stringResource(R.string.debug_frame),
+                    selectedLabel = if (mainFrameOnly) {
+                        stringResource(R.string.debug_main_frame)
+                    } else {
+                        stringResource(R.string.debug_all)
+                    },
+                    options = listOf(
+                        stringResource(R.string.debug_all) to false,
+                        stringResource(R.string.debug_main_frame) to true,
+                    ),
                     onSelected = { mainFrameOnly = it },
                 )
             }
@@ -1140,8 +1185,12 @@ private fun NetworkTab(
         if (requests.isNotEmpty()) {
             item {
                 DebugItem(
-                    title = "Host summary",
-                    subtitle = "${requests.size} requests · ${requests.count { it.isMainFrame }} main-frame",
+                    title = stringResource(R.string.debug_host_summary),
+                    subtitle = stringResource(
+                        R.string.debug_host_summary_count,
+                        requests.size,
+                        requests.count { it.isMainFrame },
+                    ),
                     details = topHosts.map { "${it.key}: ${it.value}" },
                     onCopy = onCopy,
                 )
@@ -1167,13 +1216,15 @@ private fun NetworkTab(
                         title = "${request.method} ${request.url}",
                         subtitle = formatTime(request.timestamp),
                         details = listOf(
-                            "Category: ${request.categoryLabel}",
-                            "Scheme: ${request.scheme}",
-                            "Host: ${request.host}",
-                            "Path: ${request.path}",
+                            stringResource(R.string.debug_category_label, request.categoryLabel),
+                            stringResource(R.string.debug_scheme_label, request.scheme),
+                            stringResource(R.string.debug_host_label, request.host),
+                            stringResource(R.string.debug_path_label, request.path),
                             stringResource(R.string.debug_main_frame_label, request.isMainFrame),
                             stringResource(R.string.debug_navigation_label, request.navigationId),
-                            findMatchingHttpError(request, errors)?.let { "Response: HTTP ${it.statusCode} ${it.message}" } ?: "Response: none captured",
+                            findMatchingHttpError(request, errors)?.let {
+                                stringResource(R.string.debug_response_http_label, it.statusCode ?: 0, it.message)
+                            } ?: stringResource(R.string.debug_response_none_captured),
                         ) + request.requestHeaders.map { (key, value) -> "$key: $value" },
                         onCopy = onCopy,
                         onClick = { onOpenRequest(request) },
@@ -1183,21 +1234,39 @@ private fun NetworkTab(
 
             if (filteredApiResponses.isNotEmpty()) {
                 item {
-                    SectionLabel(text = "Captured API responses")
+                    SectionLabel(text = stringResource(R.string.debug_captured_api_responses))
                 }
                 items(filteredApiResponses) { response ->
                     DebugItem(
-                        title = "${response.responseHeaders["X-Debug-Request-Method"] ?: "API"} ${response.url.orEmpty()}",
+                        title = "${response.responseHeaders["X-Debug-Request-Method"] ?: stringResource(R.string.debug_api)} ${response.url.orEmpty()}",
                         subtitle = formatTime(response.timestamp),
                         details = listOfNotNull(
-                            response.statusCode?.let { "Status: $it ${response.message}" },
-                            response.responseHeaders["X-Debug-Capture-Source"]?.let { "Source: $it" },
-                            response.responseHeaders["Content-Type"]?.let { "Content-Type: $it" },
-                            response.responseHeaders["content-type"]?.let { "Content-Type: $it" },
-                            response.responseHeaders["X-Debug-Duration-Ms"]?.let { "Duration: ${it}ms" },
-                            response.responseHeaders["X-Debug-Body-Truncated"]?.let { "Body truncated: $it" },
-                            response.responseHeaders["X-Debug-Skipped-Body"]?.let { "Body skipped: $it" },
-                            if (response.responseBody.isNullOrBlank()) "Response body: none captured" else "Response body: captured",
+                            response.statusCode?.let {
+                                stringResource(R.string.debug_status_with_message_label, it, response.message)
+                            },
+                            response.responseHeaders["X-Debug-Capture-Source"]?.let {
+                                stringResource(R.string.debug_source_label, it)
+                            },
+                            response.responseHeaders["Content-Type"]?.let {
+                                stringResource(R.string.debug_content_type_label, it)
+                            },
+                            response.responseHeaders["content-type"]?.let {
+                                stringResource(R.string.debug_content_type_label, it)
+                            },
+                            response.responseHeaders["X-Debug-Duration-Ms"]?.let {
+                                stringResource(R.string.debug_duration_ms_label, it)
+                            },
+                            response.responseHeaders["X-Debug-Body-Truncated"]?.let {
+                                stringResource(R.string.debug_body_truncated_label, it)
+                            },
+                            response.responseHeaders["X-Debug-Skipped-Body"]?.let {
+                                stringResource(R.string.debug_body_skipped_label, it)
+                            },
+                            if (response.responseBody.isNullOrBlank()) {
+                                stringResource(R.string.debug_response_body_none_captured)
+                            } else {
+                                stringResource(R.string.debug_response_body_captured)
+                            },
                         ),
                         onCopy = onCopy,
                         onClick = { onOpenApiResponse(response) },
@@ -1214,11 +1283,11 @@ private fun NetworkTab(
                         title = download.url,
                         subtitle = formatTime(download.timestamp),
                         details = listOfNotNull(
-                            download.downloadId?.let { "Download id: $it" },
-                            download.fileName?.let { "File: $it" },
-                            "Status: ${download.status}",
-                            download.reason?.let { "Reason: $it" },
-                            download.localUri?.let { "Local URI: $it" },
+                            download.downloadId?.let { stringResource(R.string.debug_download_id_label, it) },
+                            download.fileName?.let { stringResource(R.string.debug_file_label, it) },
+                            stringResource(R.string.debug_status_label, download.status),
+                            download.reason?.let { stringResource(R.string.debug_reason_label, it) },
+                            download.localUri?.let { stringResource(R.string.debug_local_uri_label, it) },
                             download.mimeType?.let { stringResource(R.string.debug_mime_label, it) },
                             download.contentDisposition?.let { stringResource(R.string.debug_disposition_label, it) },
                             download.userAgent?.let { stringResource(R.string.debug_user_agent_label, it) },
@@ -1296,7 +1365,7 @@ private fun DebugPanelHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = mode.title(),
+            text = stringResource(mode.labelRes),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -1391,7 +1460,7 @@ private fun <T> DropdownFilter(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = "$label: $selectedLabel",
+                text = stringResource(R.string.debug_filter_selected_label, label, selectedLabel),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1489,7 +1558,7 @@ private fun DebugItem(
                         contentDescription = null,
                         modifier = Modifier.padding(end = 4.dp),
                     )
-                    Text("Copy")
+                    Text(stringResource(R.string.action_copy))
                 }
             }
         }
@@ -1497,8 +1566,8 @@ private fun DebugItem(
 }
 
 internal enum class DebugMode(@get:StringRes val labelRes: Int, val icon: ImageVector) {
-    Overview(R.string.debug_group_page, Icons.Outlined.Info),
-    Timeline(R.string.debug_group_logs, Icons.Outlined.Timeline),
+    Overview(R.string.debug_group_overview, Icons.Outlined.Info),
+    Timeline(R.string.debug_group_timeline, Icons.Outlined.Timeline),
     Logs(R.string.debug_group_logs, Icons.Outlined.Terminal),
     Page(R.string.debug_group_page, Icons.Outlined.Description),
     Storage(R.string.debug_group_storage, Icons.Outlined.Storage),
@@ -1507,8 +1576,9 @@ internal enum class DebugMode(@get:StringRes val labelRes: Int, val icon: ImageV
     Execute(R.string.debug_group_execute, Icons.Outlined.Code),
 }
 
+@Composable
 internal fun DebugMode.label(state: DebugState): String {
-    val base = title()
+    val base = stringResource(labelRes)
     val count = when (this) {
         DebugMode.Overview -> state.timeline.count { it.severity != DebugSeverity.INFO }
         DebugMode.Timeline -> state.timeline.size
@@ -1521,18 +1591,6 @@ internal fun DebugMode.label(state: DebugState): String {
     }
     return if (count > 0) "$base $count" else base
 }
-
-private fun DebugMode.title(): String =
-    when (this) {
-        DebugMode.Overview -> "Overview"
-        DebugMode.Timeline -> "Timeline"
-        DebugMode.Logs -> "Logs"
-        DebugMode.Page -> "Page"
-        DebugMode.Storage -> "Storage"
-        DebugMode.Inspect -> "Inspect"
-        DebugMode.Network -> "Network"
-        DebugMode.Execute -> "Execute"
-    }
 
 private fun formatTime(timestamp: Long): String {
     if (timestamp <= 0L) return "-"

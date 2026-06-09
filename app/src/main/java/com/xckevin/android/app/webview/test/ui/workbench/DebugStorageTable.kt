@@ -39,9 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xckevin.android.app.webview.test.R
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -126,7 +128,7 @@ fun DebugStorageTableViewer(
                         onValueChange = { query = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Search") },
+                        label = { Text(stringResource(R.string.action_search)) },
                         leadingIcon = {
                             Icon(Icons.Outlined.Search, contentDescription = null)
                         },
@@ -138,7 +140,7 @@ fun DebugStorageTableViewer(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Outlined.Add, contentDescription = null)
-                        Text("Add new")
+                        Text(stringResource(R.string.debug_storage_add_new))
                     }
                 }
                 item {
@@ -162,7 +164,11 @@ fun DebugStorageTableViewer(
                 if (filteredRows.isEmpty()) {
                     item {
                         Text(
-                            text = if (rows.isEmpty()) "No storage rows" else "No matching rows",
+                            text = if (rows.isEmpty()) {
+                                stringResource(R.string.debug_no_storage_rows)
+                            } else {
+                                stringResource(R.string.debug_no_matching_rows)
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp),
@@ -214,7 +220,7 @@ fun DebugStorageTable(
     Column(modifier = modifier.fillMaxWidth()) {
         if (rows.isEmpty()) {
             Text(
-                text = "No storage rows",
+                text = stringResource(R.string.debug_no_storage_rows),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
@@ -279,7 +285,7 @@ private fun DebugStorageViewerTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.Outlined.Close, contentDescription = "Close")
+            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_close))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -290,13 +296,16 @@ private fun DebugStorageViewerTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "$rowCount rows",
+                text = stringResource(R.string.debug_rows_count, rowCount),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         IconButton(onClick = onCopy) {
-            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy all storage rows")
+            Icon(
+                Icons.Outlined.ContentCopy,
+                contentDescription = stringResource(R.string.debug_copy_all_storage_rows),
+            )
         }
     }
 }
@@ -317,7 +326,11 @@ private fun DebugStorageEditor(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = if (editingRow == null) "New ${source.label} row" else "Edit ${source.label} row",
+            text = if (editingRow == null) {
+                stringResource(R.string.debug_storage_new_row_title, source.label)
+            } else {
+                stringResource(R.string.debug_storage_edit_row_title, source.label)
+            },
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -326,14 +339,14 @@ private fun DebugStorageEditor(
             onValueChange = onKeyChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("Key") },
+            label = { Text(stringResource(R.string.debug_storage_key)) },
         )
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
-            label = { Text("Value") },
+            label = { Text(stringResource(R.string.debug_storage_value)) },
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -341,14 +354,14 @@ private fun DebugStorageEditor(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onCancel) {
-                Text("Clear")
+                Text(stringResource(R.string.action_clear))
             }
             Button(
                 onClick = onSave,
                 enabled = key.trim().isNotEmpty(),
             ) {
                 Icon(Icons.Outlined.Save, contentDescription = null)
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         }
     }
@@ -378,7 +391,7 @@ private fun DebugStorageViewerRow(
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(
-                    text = row.key.ifBlank { "(blank)" },
+                    text = row.key.ifBlank { stringResource(R.string.debug_blank_value) },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
@@ -391,13 +404,13 @@ private fun DebugStorageViewerRow(
                 )
             }
             StorageRowIconButton(
-                contentDescription = "Copy storage row",
+                contentDescription = stringResource(R.string.debug_copy_storage_row),
                 onClick = onCopy,
             ) {
                 Icon(Icons.Outlined.ContentCopy, contentDescription = null)
             }
             StorageRowIconButton(
-                contentDescription = "Delete storage row",
+                contentDescription = stringResource(R.string.debug_delete_storage_row),
                 onClick = onDelete,
             ) {
                 Icon(Icons.Outlined.Delete, contentDescription = null)
@@ -449,7 +462,7 @@ private fun DebugStorageTableRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = row.key.ifBlank { "(blank)" },
+                    text = row.key.ifBlank { stringResource(R.string.debug_blank_value) },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -464,19 +477,19 @@ private fun DebugStorageTableRow(
                 )
             }
             StorageRowIconButton(
-                contentDescription = "Copy storage row",
+                contentDescription = stringResource(R.string.debug_copy_storage_row),
                 onClick = { onCopy(row) },
             ) {
                 Icon(Icons.Outlined.ContentCopy, contentDescription = null)
             }
             StorageRowIconButton(
-                contentDescription = "Edit storage row",
+                contentDescription = stringResource(R.string.debug_edit_storage_row),
                 onClick = { onEdit(row.source, row.key, row.value) },
             ) {
                 Icon(Icons.Outlined.Edit, contentDescription = null)
             }
             StorageRowIconButton(
-                contentDescription = "Delete storage row",
+                contentDescription = stringResource(R.string.debug_delete_storage_row),
                 onClick = { onDelete(row.source, row.key) },
             ) {
                 Icon(Icons.Outlined.Delete, contentDescription = null)
