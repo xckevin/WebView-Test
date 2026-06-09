@@ -87,11 +87,21 @@ class PageScriptsTest {
         assertTrue(script.contains("Cancel"))
         assertTrue(script.contains("right:calc(env(safe-area-inset-right, 0px) + 12px)"))
         assertTrue(script.contains("top:calc(env(safe-area-inset-top, 0px) + 12px)"))
+        assertTrue(script.contains("window.__wvDebugInspectLastResult = payload"))
         assertTrue(script.contains("__wvAndroidDebug.onInspectResult"))
         assertTrue(script.contains("document.addEventListener(\"pointerdown\""))
         assertTrue(script.contains("MAX_PATH_DEPTH = 24"))
         assertTrue(script.contains("MAX_ATTRIBUTES = 16"))
         assertTrue(script.contains("MAX_TEXT_LENGTH = 500"))
+    }
+
+    @Test fun inspectPointerResultFallbackCanBeReadAndCleared() {
+        val read = PageScripts.readLastFloatingInspectPointerResult()
+        val clear = PageScripts.clearLastFloatingInspectPointerResult()
+
+        assertTrue(read.contains("__wvDebugInspectLastResult || null"))
+        assertTrue(read.contains("delete window.__wvDebugInspectLastResult"))
+        assertTrue(clear.contains("Inspect pointer result cleared."))
     }
 
     @Test fun confirmFloatingInspectPointerReadsExistingOverlaySelection() {

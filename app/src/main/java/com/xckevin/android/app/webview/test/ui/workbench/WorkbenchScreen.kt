@@ -81,6 +81,7 @@ import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.debug.DebugClearScope
 import com.xckevin.android.app.webview.test.debug.DebugNetworkApiCaptureParser
 import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.debug.PageScripts
 import com.xckevin.android.app.webview.test.debug.PageError
 import com.xckevin.android.app.webview.test.debug.UserFlowKind
 import com.xckevin.android.app.webview.test.model.HistoryItem
@@ -92,6 +93,7 @@ import com.xckevin.android.app.webview.test.web.WebPermissionPrompt
 import com.xckevin.android.app.webview.test.web.WebViewController
 import com.xckevin.android.app.webview.test.web.WebViewHost
 import com.xckevin.android.app.webview.test.web.rememberWebViewController
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -204,6 +206,22 @@ fun WorkbenchScreen(
     val openLocalFixture: () -> Unit = {
         viewModel.loadLocalFile("file:///android_asset/fixtures/local_debug_fixture.html")
     }
+    val startInspectResultPolling: () -> Unit = {
+        coroutineScope.launch {
+            repeat(40) {
+                if (bridgeInspectResult != null) return@launch
+                var shouldStop = false
+                webViewController.evaluateJavaScript(PageScripts.readLastFloatingInspectPointerResult()) { result ->
+                    if (bridgeInspectResult == null && result.hasInspectPointerResult()) {
+                        bridgeInspectResult = result
+                        shouldStop = true
+                    }
+                }
+                delay(250)
+                if (shouldStop || bridgeInspectResult != null) return@launch
+            }
+        }
+    }
 
     BackHandler(enabled = state.isVideoFullscreen || state.isFullscreen || state.canGoBack) {
         if (state.isVideoFullscreen && webViewController.hideCustomView()) {
@@ -218,7 +236,10 @@ fun WorkbenchScreen(
 
     DisposableEffect(Unit) {
         webViewController.setDebugBridgeCallbacks(
-            onInspectResult = { result -> bridgeInspectResult = result },
+            onInspectResult = { result ->
+                bridgeInspectResult = result
+                webViewController.evaluateJavaScript(PageScripts.clearLastFloatingInspectPointerResult()) {}
+            },
             onNetworkApiCapture = { result ->
                 DebugNetworkApiCaptureParser.parsePageErrors(result).forEach { response ->
                     apiResponses.add(0, response)
@@ -317,6 +338,7 @@ fun WorkbenchScreen(
                 onReadCookies = readCookies,
                 onClearCookies = clearCookies,
                 onClearWebViewCache = clearWebViewCache,
+                onInspectPointerStarted = startInspectResultPolling,
                 onFullscreenExit = {
                     if (!state.isVideoFullscreen || !webViewController.hideCustomView()) {
                         viewModel.toggleFullscreen()
@@ -421,6 +443,7 @@ internal fun WorkbenchFrame(
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
+    onInspectPointerStarted: () -> Unit = {},
     modifier: Modifier = Modifier,
     onFullscreenExit: () -> Unit = {},
 ) {
@@ -513,7 +536,7 @@ internal fun WorkbenchFrame(
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
                         onClearWebViewCache = onClearWebViewCache,
-                        onInspectPointerStarted = {},
+                        onInspectPointerStarted = onInspectPointerStarted,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -540,7 +563,10 @@ internal fun WorkbenchFrame(
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
                         onClearWebViewCache = onClearWebViewCache,
-                        onInspectPointerStarted = closeTools,
+                        onInspectPointerStarted = {
+                            onInspectPointerStarted()
+                            closeTools()
+                        },
                         modifier = Modifier
                             .fillMaxSize()
                             .zIndex(4f),
@@ -1034,6 +1060,9 @@ private fun PanelContent(
         modifier = modifier,
     )
 }
+
+private fun String.hasInspectPointerResult(): Boolean =
+    DebugInspectParser.parse(this) is DebugInspectResult.Tree
 
 private val WorkbenchPanel.debugMode: DebugMode
     get() = when (this) {

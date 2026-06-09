@@ -87,6 +87,28 @@ class DebugInspectParserTest {
         assertEquals("buy-button", parsed.path[parsed.selectedIndex].attributes["data-testid"])
     }
 
+    @Test fun parsesBareSelectedElementTreeFromBridgeCallback() {
+        val result = """
+            {
+              "type": "selectedElementTree",
+              "selectedIndex": 1,
+              "truncatedAncestors": false,
+              "path": [
+                {"tag": "html", "text": "Page", "visible": true, "depth": 0, "childIndex": 0, "childCount": 1},
+                {"tag": "a", "id": "docs", "text": "Docs", "href": "https://example.com/docs", "visible": true, "depth": 1, "childIndex": 0, "childCount": 0}
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = DebugInspectParser.parse(result) as DebugInspectResult.Tree
+
+        assertEquals(2, parsed.path.size)
+        assertEquals(1, parsed.selectedIndex)
+        assertEquals("a", parsed.path[parsed.selectedIndex].tag)
+        assertEquals("Docs", parsed.path[parsed.selectedIndex].text)
+        assertEquals("https://example.com/docs", parsed.path[parsed.selectedIndex].href)
+    }
+
     @Test fun parsesReadSourceWrapperAsSource() {
         val result = """{"ok":true,"value":"<!doctype html><html><body><main>Content</main></body></html>"}"""
 

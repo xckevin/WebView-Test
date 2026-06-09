@@ -414,6 +414,7 @@ object PageScripts {
         confirmButton.addEventListener("click", (event) => {
           stopPageEvent(event);
           const payload = window.__wvDebugInspect.confirm();
+          window.__wvDebugInspectLastResult = payload;
           if (window.__wvAndroidDebug && typeof window.__wvAndroidDebug.onInspectResult === "function") {
             window.__wvAndroidDebug.onInspectResult(JSON.stringify(payload));
           } else {
@@ -478,6 +479,23 @@ object PageScripts {
 
         moveTo(state.x + 26, state.y + 26);
         return "Inspect pointer started. Tap or drag on the page, then use Confirm or Cancel on the page overlay.";
+        """.trimIndent()
+    )
+
+    fun readLastFloatingInspectPointerResult(): String = wrap(
+        """
+        const result = window.__wvDebugInspectLastResult || null;
+        if (result) {
+          delete window.__wvDebugInspectLastResult;
+        }
+        return result;
+        """.trimIndent()
+    )
+
+    fun clearLastFloatingInspectPointerResult(): String = wrap(
+        """
+        delete window.__wvDebugInspectLastResult;
+        return "Inspect pointer result cleared.";
         """.trimIndent()
     )
 
