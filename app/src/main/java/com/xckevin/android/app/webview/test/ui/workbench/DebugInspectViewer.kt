@@ -336,7 +336,7 @@ private fun TreeInspectContent(
     val selectedElement = result.path.getOrNull(selectedIndex)
 
     Column(modifier = modifier.fillMaxSize()) {
-        result.error?.let { ErrorBanner(it) }
+        result.error?.takeIf { it.isNotBlank() }?.let { ErrorBanner(it) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -488,7 +488,7 @@ private fun ElementInspectContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         SearchField(query = query, onQueryChange = onQueryChange)
-        result.error?.let { ErrorBanner(it) }
+        result.error?.takeIf { it.isNotBlank() }?.let { ErrorBanner(it) }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 6.dp),
@@ -618,7 +618,7 @@ private fun PlainInspectContent(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp),
     ) {
-        result.error?.let {
+        result.error?.takeIf { it.isNotBlank() }?.let {
             item { ErrorBanner(it) }
         }
         item {
