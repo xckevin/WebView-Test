@@ -190,6 +190,494 @@ object PageScripts {
         )
     }
 
+    fun startFloatingInspectPointer(): String = wrap(
+        """
+        const existing = window.__wvDebugInspect;
+        if (existing && typeof existing.cleanup === "function") {
+          existing.cleanup();
+        }
+
+        const state = {
+          target: null,
+          x: Math.max(24, Math.round(window.innerWidth / 2) - 24),
+          y: Math.max(24, Math.round(window.innerHeight / 2) - 24)
+        };
+        const overlay = document.createElement("div");
+        const label = document.createElement("div");
+        const highlight = document.createElement("div");
+        const crosshair = document.createElement("div");
+        const actionBar = document.createElement("div");
+        const confirmButton = document.createElement("button");
+        const cancelButton = document.createElement("button");
+
+        overlay.id = "__wv_debug_inspect_pointer";
+        overlay.setAttribute("aria-label", "WebView inspect pointer");
+        overlay.style.cssText = [
+          "position:fixed",
+          "left:" + state.x + "px",
+          "top:" + state.y + "px",
+          "width:52px",
+          "height:52px",
+          "border-radius:999px",
+          "background:rgba(20,22,26,0.88)",
+          "border:2px solid #7dd3fc",
+          "box-shadow:0 8px 24px rgba(0,0,0,0.34)",
+          "z-index:2147483647",
+          "cursor:grab",
+          "touch-action:none",
+          "box-sizing:border-box"
+        ].join(";");
+        crosshair.style.cssText = [
+          "position:absolute",
+          "left:50%",
+          "top:50%",
+          "width:18px",
+          "height:18px",
+          "margin-left:-9px",
+          "margin-top:-9px",
+          "border:2px solid #ffffff",
+          "border-radius:999px",
+          "box-sizing:border-box",
+          "pointer-events:none"
+        ].join(";");
+        label.style.cssText = [
+          "position:absolute",
+          "left:50%",
+          "top:58px",
+          "transform:translateX(-50%)",
+          "max-width:240px",
+          "padding:5px 8px",
+          "border-radius:6px",
+          "background:rgba(20,22,26,0.92)",
+          "color:#ffffff",
+          "font:12px/1.3 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif",
+          "white-space:nowrap",
+          "overflow:hidden",
+          "text-overflow:ellipsis",
+          "pointer-events:none"
+        ].join(";");
+        highlight.id = "__wv_debug_inspect_highlight";
+        highlight.style.cssText = [
+          "position:fixed",
+          "display:none",
+          "border:2px solid #38bdf8",
+          "background:rgba(56,189,248,0.12)",
+          "z-index:2147483646",
+          "pointer-events:none",
+          "box-sizing:border-box"
+        ].join(";");
+        actionBar.id = "__wv_debug_inspect_actions";
+        actionBar.style.cssText = [
+          "position:fixed",
+          "right:calc(env(safe-area-inset-right, 0px) + 12px)",
+          "top:calc(env(safe-area-inset-top, 0px) + 12px)",
+          "display:flex",
+          "gap:8px",
+          "padding:8px",
+          "border-radius:10px",
+          "background:rgba(20,22,26,0.92)",
+          "box-shadow:0 8px 24px rgba(0,0,0,0.34)",
+          "z-index:2147483647",
+          "pointer-events:auto",
+          "max-width:calc(100vw - 24px)",
+          "box-sizing:border-box"
+        ].join(";");
+        const buttonStyle = [
+          "min-width:88px",
+          "height:40px",
+          "border:0",
+          "border-radius:7px",
+          "padding:0 12px",
+          "font:600 13px/40px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif",
+          "color:#0f172a",
+          "background:#7dd3fc",
+          "touch-action:manipulation"
+        ].join(";");
+        confirmButton.type = "button";
+        confirmButton.textContent = "Confirm";
+        confirmButton.style.cssText = buttonStyle;
+        cancelButton.type = "button";
+        cancelButton.textContent = "Cancel";
+        cancelButton.style.cssText = buttonStyle + ";background:#e5e7eb";
+
+        const labelFor = (element) => {
+          if (!element || !element.tagName) return "No element";
+          const id = element.id ? "#" + element.id : "";
+          const className = (element.getAttribute("class") || "")
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 3)
+            .map((value) => "." + value)
+            .join("");
+          return element.tagName.toLowerCase() + id + className;
+        };
+        const findTarget = () => {
+          const centerX = state.x + 26;
+          const centerY = state.y + 26;
+          overlay.style.pointerEvents = "none";
+          actionBar.style.pointerEvents = "none";
+          const target = document.elementFromPoint(centerX, centerY);
+          overlay.style.pointerEvents = "auto";
+          actionBar.style.pointerEvents = "auto";
+          state.target = target === overlay || target === label || target === crosshair || target === actionBar ? null : target;
+          label.textContent = labelFor(state.target);
+          if (state.target && state.target.getBoundingClientRect) {
+            const rect = state.target.getBoundingClientRect();
+            highlight.style.display = "block";
+            highlight.style.left = Math.round(rect.left) + "px";
+            highlight.style.top = Math.round(rect.top) + "px";
+            highlight.style.width = Math.round(rect.width) + "px";
+            highlight.style.height = Math.round(rect.height) + "px";
+          } else {
+            highlight.style.display = "none";
+          }
+        };
+        const moveTo = (x, y) => {
+          state.x = Math.min(Math.max(0, Math.round(x - 26)), Math.max(0, window.innerWidth - 52));
+          state.y = Math.min(Math.max(0, Math.round(y - 26)), Math.max(0, window.innerHeight - 52));
+          overlay.style.left = state.x + "px";
+          overlay.style.top = state.y + "px";
+          findTarget();
+        };
+        const isInspectorNode = (node) => {
+          return node === overlay ||
+            node === label ||
+            node === crosshair ||
+            node === actionBar ||
+            node === confirmButton ||
+            node === cancelButton ||
+            (node && node.closest && node.closest("#__wv_debug_inspect_actions"));
+        };
+        const stopPageEvent = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        };
+        let dragging = false;
+        overlay.addEventListener("pointerdown", (event) => {
+          dragging = true;
+          overlay.style.cursor = "grabbing";
+          overlay.setPointerCapture(event.pointerId);
+          stopPageEvent(event);
+        });
+        overlay.addEventListener("pointermove", (event) => {
+          if (dragging) moveTo(event.clientX, event.clientY);
+        });
+        overlay.addEventListener("pointerup", (event) => {
+          dragging = false;
+          overlay.style.cursor = "grab";
+          try { overlay.releasePointerCapture(event.pointerId); } catch (_) {}
+          findTarget();
+        });
+        overlay.addEventListener("pointercancel", () => {
+          dragging = false;
+          overlay.style.cursor = "grab";
+        });
+        const pagePointerDown = (event) => {
+          if (isInspectorNode(event.target)) return;
+          moveTo(event.clientX, event.clientY);
+          stopPageEvent(event);
+        };
+        const pageClick = (event) => {
+          if (isInspectorNode(event.target)) return;
+          stopPageEvent(event);
+        };
+
+        overlay.appendChild(crosshair);
+        overlay.appendChild(label);
+        actionBar.appendChild(confirmButton);
+        actionBar.appendChild(cancelButton);
+        document.documentElement.appendChild(highlight);
+        document.documentElement.appendChild(overlay);
+        document.documentElement.appendChild(actionBar);
+        document.addEventListener("pointerdown", pagePointerDown, true);
+        document.addEventListener("click", pageClick, true);
+
+        window.__wvDebugInspect = {
+          overlay: overlay,
+          highlight: highlight,
+          get target() { return state.target; },
+          cleanup: function() {
+            document.removeEventListener("pointerdown", pagePointerDown, true);
+            document.removeEventListener("click", pageClick, true);
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            if (highlight.parentNode) highlight.parentNode.removeChild(highlight);
+            if (actionBar.parentNode) actionBar.parentNode.removeChild(actionBar);
+            if (window.__wvDebugInspect === this) delete window.__wvDebugInspect;
+          },
+          confirm: function() {
+            const payload = serializeSelectedInspectTree(state.target, state.x + 26, state.y + 26);
+            this.cleanup();
+            return payload;
+          }
+        };
+        confirmButton.addEventListener("click", (event) => {
+          stopPageEvent(event);
+          const payload = window.__wvDebugInspect.confirm();
+          if (window.__wvAndroidDebug && typeof window.__wvAndroidDebug.onInspectResult === "function") {
+            window.__wvAndroidDebug.onInspectResult(JSON.stringify(payload));
+          } else {
+            window.__wvDebugInspectLastResult = payload;
+          }
+        });
+        cancelButton.addEventListener("click", (event) => {
+          stopPageEvent(event);
+          if (window.__wvDebugInspect && typeof window.__wvDebugInspect.cleanup === "function") {
+            window.__wvDebugInspect.cleanup();
+          }
+        });
+
+        function serializeSelectedInspectTree(target, pointX, pointY) {
+          const MAX_PATH_DEPTH = 24;
+          const MAX_ATTRIBUTES = 16;
+          const MAX_TEXT_LENGTH = 500;
+          const MAX_ATTRIBUTE_LENGTH = 160;
+          const elements = [];
+          let node = target && target.nodeType === 1 ? target : null;
+          while (node && node.nodeType === 1) {
+            elements.unshift(node);
+            node = node.parentElement;
+          }
+          const truncated = elements.length > MAX_PATH_DEPTH;
+          const path = elements.slice(Math.max(0, elements.length - MAX_PATH_DEPTH));
+          const summarize = (element, depth) => {
+            const rect = element.getBoundingClientRect();
+            const attributes = {};
+            Array.from(element.attributes || []).slice(0, MAX_ATTRIBUTES).forEach((attribute) => {
+              attributes[attribute.name] = String(attribute.value || "").slice(0, MAX_ATTRIBUTE_LENGTH);
+            });
+            const parent = element.parentElement;
+            return {
+              tag: element.tagName.toLowerCase(),
+              id: element.id || "",
+              className: element.getAttribute("class") || "",
+              text: (element.innerText || element.alt || element.value || element.textContent || "").trim().slice(0, MAX_TEXT_LENGTH),
+              visible: !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length),
+              rect: {
+                x: Math.round(rect.x),
+                y: Math.round(rect.y),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height)
+              },
+              attributes: attributes,
+              href: typeof element.href === "string" ? element.href : "",
+              src: typeof element.src === "string" ? element.src : "",
+              depth: depth,
+              childIndex: parent ? Array.prototype.indexOf.call(parent.children, element) : 0,
+              childCount: element.children ? element.children.length : 0
+            };
+          };
+          return {
+            type: "selectedElementTree",
+            selectedIndex: Math.max(0, path.length - 1),
+            truncatedAncestors: truncated,
+            point: { x: Math.round(pointX), y: Math.round(pointY) },
+            path: path.map((element, index) => summarize(element, index))
+          };
+        }
+
+        moveTo(state.x + 26, state.y + 26);
+        return "Inspect pointer started. Tap or drag on the page, then use Confirm or Cancel on the page overlay.";
+        """.trimIndent()
+    )
+
+    fun confirmFloatingInspectPointer(): String = wrap(
+        """
+        if (!window.__wvDebugInspect || typeof window.__wvDebugInspect.confirm !== "function") {
+          return { error: "Inspect pointer is not active." };
+        }
+        return window.__wvDebugInspect.confirm();
+        """.trimIndent()
+    )
+
+    fun cancelFloatingInspectPointer(): String = wrap(
+        """
+        if (window.__wvDebugInspect && typeof window.__wvDebugInspect.cleanup === "function") {
+          window.__wvDebugInspect.cleanup();
+          return "Inspect pointer cancelled.";
+        }
+        return "Inspect pointer was not active.";
+        """.trimIndent()
+    )
+
+    fun installNetworkApiCapture(): String = wrap(
+        """
+        if (window.__wvDebugNetworkApi && window.__wvDebugNetworkApi.installed) {
+          return "Network API capture already installed: " + window.__wvDebugNetworkApi.captures.length + " captured";
+        }
+
+        const MAX_BODY_CHARS = 65536;
+        const MAX_ENTRIES = 100;
+        const originalFetch = window.fetch;
+        const originalXhrOpen = XMLHttpRequest.prototype.open;
+        const originalXhrSend = XMLHttpRequest.prototype.send;
+        const captures = [];
+
+        const textExtensions = [".json", ".txt", ".text", ".html", ".htm", ".css", ".js", ".mjs", ".xml"];
+        const isTextLike = (contentType, url) => {
+          const type = String(contentType || "").split(";")[0].trim().toLowerCase();
+          const path = String(url || "").split("?")[0].split("#")[0].toLowerCase();
+          return type.startsWith("text/") ||
+            type === "application/json" ||
+            type === "text/json" ||
+            type.endsWith("+json") ||
+            type.includes("javascript") ||
+            type.includes("xml") ||
+            textExtensions.some((extension) => path.endsWith(extension));
+        };
+        const capBody = (body) => {
+          const text = String(body || "");
+          return {
+            body: text.length > MAX_BODY_CHARS ? text.slice(0, MAX_BODY_CHARS) : text,
+            truncated: text.length > MAX_BODY_CHARS
+          };
+        };
+        const addCapture = (capture) => {
+          captures.push(capture);
+          while (captures.length > MAX_ENTRIES) captures.shift();
+          if (window.__wvAndroidDebug && typeof window.__wvAndroidDebug.onNetworkApiCapture === "function") {
+            window.__wvAndroidDebug.onNetworkApiCapture(JSON.stringify(capture));
+          }
+        };
+        const headersToObject = (headers) => {
+          const result = {};
+          if (!headers) return result;
+          if (typeof headers.forEach === "function") {
+            headers.forEach((value, key) => { result[key] = value; });
+          }
+          return result;
+        };
+
+        if (typeof originalFetch === "function") {
+          window.fetch = function(input, init) {
+            const startedAt = Date.now();
+            const url = typeof input === "string" ? input : (input && input.url) || "";
+            const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
+            return originalFetch.apply(this, arguments).then((response) => {
+              const headers = headersToObject(response.headers);
+              const contentType = response.headers && response.headers.get ? response.headers.get("content-type") : "";
+              const base = {
+                source: "fetch",
+                url: response.url || url,
+                method: method,
+                status: response.status,
+                statusText: response.statusText || "",
+                responseHeaders: headers,
+                contentType: contentType || "",
+                timestamp: Date.now(),
+                durationMs: Date.now() - startedAt
+              };
+              if (!isTextLike(contentType, base.url)) {
+                addCapture(Object.assign(base, {
+                  responseBody: "",
+                  bodyTruncated: false,
+                  skippedBodyReason: "Non-text response"
+                }));
+                return response;
+              }
+              response.clone().text()
+                .then((body) => {
+                  const capped = capBody(body);
+                  addCapture(Object.assign(base, {
+                    responseBody: capped.body,
+                    bodyTruncated: capped.truncated
+                  }));
+                })
+                .catch((error) => {
+                  addCapture(Object.assign(base, {
+                    responseBody: "",
+                    bodyTruncated: false,
+                    skippedBodyReason: String(error)
+                  }));
+                });
+              return response;
+            });
+          };
+        }
+
+        XMLHttpRequest.prototype.open = function(method, url) {
+          this.__wvDebugApi = {
+            source: "xhr",
+            method: String(method || "GET").toUpperCase(),
+            url: String(url || ""),
+            startedAt: Date.now()
+          };
+          return originalXhrOpen.apply(this, arguments);
+        };
+        XMLHttpRequest.prototype.send = function() {
+          const xhr = this;
+          const meta = xhr.__wvDebugApi || { source: "xhr", method: "GET", url: "", startedAt: Date.now() };
+          xhr.addEventListener("loadend", function() {
+            const contentType = xhr.getResponseHeader("content-type") || "";
+            const headersText = xhr.getAllResponseHeaders ? xhr.getAllResponseHeaders() : "";
+            const headers = {};
+            headersText.trim().split(/[\r\n]+/).filter(Boolean).forEach((line) => {
+              const separator = line.indexOf(":");
+              if (separator > 0) headers[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+            });
+            const base = {
+              source: "xhr",
+              url: xhr.responseURL || meta.url,
+              method: meta.method,
+              status: xhr.status,
+              statusText: xhr.statusText || "",
+              responseHeaders: headers,
+              contentType: contentType,
+              timestamp: Date.now(),
+              durationMs: Date.now() - meta.startedAt
+            };
+            if (!isTextLike(contentType, base.url) || (xhr.responseType && xhr.responseType !== "text")) {
+              addCapture(Object.assign(base, {
+                responseBody: "",
+                bodyTruncated: false,
+                skippedBodyReason: "Non-text response"
+              }));
+              return;
+            }
+            try {
+              const capped = capBody(xhr.responseText || "");
+              addCapture(Object.assign(base, {
+                responseBody: capped.body,
+                bodyTruncated: capped.truncated
+              }));
+            } catch (error) {
+              addCapture(Object.assign(base, {
+                responseBody: "",
+                bodyTruncated: false,
+                skippedBodyReason: String(error)
+              }));
+            }
+          });
+          return originalXhrSend.apply(this, arguments);
+        };
+
+        window.__wvDebugNetworkApi = {
+          installed: true,
+          captures: captures,
+          clear: function() { captures.length = 0; }
+        };
+        return "Network API capture installed";
+        """.trimIndent()
+    )
+
+    fun readNetworkApiCaptures(): String = wrap(
+        """
+        return window.__wvDebugNetworkApi && window.__wvDebugNetworkApi.captures
+          ? window.__wvDebugNetworkApi.captures.slice()
+          : [];
+        """.trimIndent()
+    )
+
+    fun clearNetworkApiCaptures(): String = wrap(
+        """
+        if (window.__wvDebugNetworkApi && typeof window.__wvDebugNetworkApi.clear === "function") {
+          window.__wvDebugNetworkApi.clear();
+          return "Network API captures cleared";
+        }
+        return "Network API capture is not installed.";
+        """.trimIndent()
+    )
+
     fun templates(): List<ScriptTemplate> =
         listOf(
             ScriptTemplate(

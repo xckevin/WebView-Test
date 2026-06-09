@@ -343,6 +343,37 @@ class WorkbenchScreenTest {
     }
 
     @Test
+    fun networkCaptureDoesNotRequireManualInstallControls() {
+        composeRule.setContent {
+            WebViewTestTheme(darkTheme = false) {
+                Box(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .height(640.dp),
+                ) {
+                    DebugPanel(
+                        debugState = DebugState(),
+                        config = WebTestConfig.default(),
+                        sourceType = SourceType.REMOTE_URL,
+                        onClearDebugLogs = {},
+                        onEvaluateJavaScript = { _, callback -> callback("") },
+                        onReadCookies = { callback -> callback("") },
+                        onClearCookies = {},
+                        onClearWebViewCache = {},
+                        selectedMode = DebugMode.Network,
+                        showModeTabs = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithText("Install API capture").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Read captured API responses").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Clear API captures").assertCountEquals(0)
+    }
+
+    @Test
     fun debugPanelDoesNotShowDuplicateClearActions() {
         var selectedMode by mutableStateOf(DebugMode.Overview)
 

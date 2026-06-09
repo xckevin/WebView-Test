@@ -298,6 +298,7 @@ fun WorkbenchScreen(
                 onReadCookies = readCookies,
                 onClearCookies = clearCookies,
                 onClearWebViewCache = clearWebViewCache,
+                onDebugBridgeCallbacksChanged = webViewController::setDebugBridgeCallbacks,
                 onFullscreenExit = {
                     if (!state.isVideoFullscreen || !webViewController.hideCustomView()) {
                         viewModel.toggleFullscreen()
@@ -384,6 +385,10 @@ internal fun WorkbenchFrame(
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
+    onDebugBridgeCallbacksChanged: (
+        onInspectResult: ((String) -> Unit)?,
+        onNetworkApiCapture: ((String) -> Unit)?,
+    ) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     onFullscreenExit: () -> Unit = {},
 ) {
@@ -474,6 +479,8 @@ internal fun WorkbenchFrame(
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
                         onClearWebViewCache = onClearWebViewCache,
+                        onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
+                        onInspectPointerStarted = {},
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -498,6 +505,8 @@ internal fun WorkbenchFrame(
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
                         onClearWebViewCache = onClearWebViewCache,
+                        onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
+                        onInspectPointerStarted = closeTools,
                         modifier = Modifier
                             .fillMaxSize()
                             .zIndex(4f),
@@ -555,6 +564,11 @@ private fun WorkbenchDrawer(
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
+    onDebugBridgeCallbacksChanged: (
+        onInspectResult: ((String) -> Unit)?,
+        onNetworkApiCapture: ((String) -> Unit)?,
+    ) -> Unit,
+    onInspectPointerStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -612,6 +626,8 @@ private fun WorkbenchDrawer(
                 onReadCookies = onReadCookies,
                 onClearCookies = onClearCookies,
                 onClearWebViewCache = onClearWebViewCache,
+                onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
+                onInspectPointerStarted = onInspectPointerStarted,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
@@ -870,6 +886,11 @@ private fun WorkbenchPanelSurface(
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
+    onDebugBridgeCallbacksChanged: (
+        onInspectResult: ((String) -> Unit)?,
+        onNetworkApiCapture: ((String) -> Unit)?,
+    ) -> Unit,
+    onInspectPointerStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -896,6 +917,8 @@ private fun WorkbenchPanelSurface(
                 onReadCookies = onReadCookies,
                 onClearCookies = onClearCookies,
                 onClearWebViewCache = onClearWebViewCache,
+                onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
+                onInspectPointerStarted = onInspectPointerStarted,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -956,6 +979,11 @@ private fun PanelContent(
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
+    onDebugBridgeCallbacksChanged: (
+        onInspectResult: ((String) -> Unit)?,
+        onNetworkApiCapture: ((String) -> Unit)?,
+    ) -> Unit,
+    onInspectPointerStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     DebugPanel(
@@ -968,6 +996,8 @@ private fun PanelContent(
         onReadCookies = onReadCookies,
         onClearCookies = onClearCookies,
         onClearWebViewCache = onClearWebViewCache,
+        onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
+        onInspectPointerStarted = onInspectPointerStarted,
         selectedMode = selectedPanel.debugMode,
         showModeTabs = false,
         modifier = modifier,

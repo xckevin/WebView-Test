@@ -78,6 +78,54 @@ class PageScriptsTest {
         assertTrue(script.contains("attributes"))
     }
 
+    @Test fun startFloatingInspectPointerUsesElementFromPointAndBoundsSerialization() {
+        val script = PageScripts.startFloatingInspectPointer()
+
+        assertTrue(script.contains("__wvDebugInspect"))
+        assertTrue(script.contains("document.elementFromPoint"))
+        assertTrue(script.contains("Confirm"))
+        assertTrue(script.contains("Cancel"))
+        assertTrue(script.contains("right:calc(env(safe-area-inset-right, 0px) + 12px)"))
+        assertTrue(script.contains("top:calc(env(safe-area-inset-top, 0px) + 12px)"))
+        assertTrue(script.contains("__wvAndroidDebug.onInspectResult"))
+        assertTrue(script.contains("document.addEventListener(\"pointerdown\""))
+        assertTrue(script.contains("MAX_PATH_DEPTH = 24"))
+        assertTrue(script.contains("MAX_ATTRIBUTES = 16"))
+        assertTrue(script.contains("MAX_TEXT_LENGTH = 500"))
+    }
+
+    @Test fun confirmFloatingInspectPointerReadsExistingOverlaySelection() {
+        val script = PageScripts.confirmFloatingInspectPointer()
+
+        assertTrue(script.contains("__wvDebugInspect.confirm"))
+        assertTrue(script.contains("Inspect pointer is not active."))
+    }
+
+    @Test fun cancelFloatingInspectPointerCleansExistingOverlay() {
+        val script = PageScripts.cancelFloatingInspectPointer()
+
+        assertTrue(script.contains("__wvDebugInspect.cleanup"))
+        assertTrue(script.contains("Inspect pointer cancelled."))
+    }
+
+    @Test fun networkApiCaptureScriptsWrapFetchAndXhr() {
+        val install = PageScripts.installNetworkApiCapture()
+
+        assertTrue(install.contains("__wvDebugNetworkApi"))
+        assertTrue(install.contains("window.fetch = function"))
+        assertTrue(install.contains("XMLHttpRequest.prototype.open"))
+        assertTrue(install.contains("__wvAndroidDebug.onNetworkApiCapture"))
+        assertTrue(install.contains("MAX_BODY_CHARS = 65536"))
+    }
+
+    @Test fun readAndClearNetworkApiCaptureScriptsUseSharedState() {
+        val read = PageScripts.readNetworkApiCaptures()
+        val clear = PageScripts.clearNetworkApiCaptures()
+
+        assertTrue(read.contains("__wvDebugNetworkApi.captures.slice()"))
+        assertTrue(clear.contains("__wvDebugNetworkApi.clear"))
+    }
+
     @Test fun scriptTemplatesExposeCommonDiagnostics() {
         val templates = PageScripts.templates()
 

@@ -128,6 +128,33 @@ class DebugNetworkDetailTest {
         assertNull(findMatchingHttpError(request, listOf(error)))
     }
 
+    @Test fun capturedApiResponseMatchesRequestWithoutNavigationId() {
+        val request = request(navigationId = 7L).copy(url = "https://example.com/api/user")
+        val response = PageError(
+            type = "ApiResponse",
+            message = "OK",
+            url = request.url,
+            statusCode = 200,
+            responseHeaders = mapOf("Content-Type" to "application/json"),
+            responseBody = """{"name":"Ada"}""",
+            navigationId = 0L,
+            isMainFrame = false,
+            timestamp = 200L,
+        )
+
+        val matched = findMatchingHttpError(request, listOf(response))
+        val sections = buildNetworkDetailSections(
+            request = request,
+            error = matched,
+            download = null,
+        )
+
+        assertEquals(response, matched)
+        assertEquals("200", sections.rowValue("Meta", "Status code"))
+        assertEquals("JSON", sections.rowValue("Response body", "Type"))
+        assertTrue(sections.rowValue("Response body", "Body").orEmpty().contains("Ada"))
+    }
+
     @Test fun downloadSectionContainsAllDownloadFields() {
         val download = DownloadSnapshot(
             url = "https://example.com/report.pdf",
@@ -153,6 +180,9 @@ class DebugNetworkDetailTest {
 
         assertTrue(sections.map { it.title }.containsAll(networkSectionTitles))
         assertEquals(NetworkDetailSectionKind.Download, sections.last().kind)
+        assertEquals("PDF", sections.rowValue("Media preview", "Kind"))
+        assertEquals(download.url, sections.rowValue("Media preview", "Preview URL"))
+        assertEquals(download.localUri, sections.rowValue("Media preview", "Preview local URI"))
         val rows = sections.last().rows.associate { it.label to it.value }
         assertEquals(download.url, sections.rowValue("URL", "Download URL"))
         assertEquals("WebViewTest", rows["User agent"])
@@ -216,11 +246,30 @@ class DebugNetworkDetailTest {
 
         assertTrue(text.contains("URL\nRequest URL: https://example.com/index.html"))
         assertTrue(text.contains("Request headers\nAccept: application/json"))
-        assertTrue(text.contains("""Request body
-Body: {"q":"test"}"""))
+        assertTrue(text.contains("Request body\nType: JSON\nBody: {"))
+        assertTrue(text.contains("q"))
+        assertTrue(text.contains("test"))
         assertTrue(text.contains("Response headers\nContent-Type: application/json"))
-        assertTrue(text.contains("""Response body
-Body: {"ok":true}"""))
+        assertTrue(text.contains("Response body\nType: JSON\nBody: {"))
+        assertTrue(text.contains("ok"))
+        assertTrue(text.contains("true"))
+    }
+
+    @Test fun mediaPreviewSectionIsAddedForMediaRequest() {
+        val request = request(navigationId = 10L).copy(
+            url = "https://example.com/image.webp",
+            isMainFrame = false,
+            category = RequestCategory.RESOURCE,
+        )
+
+        val sections = buildNetworkDetailSections(
+            request = request,
+            error = null,
+            download = null,
+        )
+
+        assertEquals("Image", sections.rowValue("Media preview", "Kind"))
+        assertEquals(request.url, sections.rowValue("Media preview", "Preview URL"))
     }
 
     private val networkSectionTitles = listOf(

@@ -9,19 +9,27 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.xckevin.android.app.webview.test.debug.DebugNetworkContentFormatter
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 
 class TestWebViewClient(
     private val navigationTracker: WebViewNavigationTracker,
     private val onEvent: (WebPageEvent) -> Unit,
+    private val onDebugPageReady: (WebView) -> Unit = {},
 ) : WebViewClient() {
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         val navigationId = navigationTracker.onPageStarted(url.orEmpty()) ?: return
+        view?.let(onDebugPageReady)
         emit(view, WebPageEvent.PageStarted(navigationId = navigationId, url = url.orEmpty()))
         emitNavigationState(view = view, navigationId = navigationId, url = url)
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
         val navigationId = navigationTracker.onPageFinished(url.orEmpty()) ?: return
+        view?.let(onDebugPageReady)
         emit(
             view,
             WebPageEvent.PageFinished(
@@ -81,6 +89,7 @@ class TestWebViewClient(
                 statusCode = errorResponse?.statusCode ?: 0,
                 reason = errorResponse?.reasonPhrase.orEmpty(),
                 responseHeaders = errorResponse?.responseHeaders.orEmpty(),
+                responseBody = errorResponse.capturedTextBody(request?.url?.toString()),
                 navigationId = navigationId,
                 isMainFrame = request?.isForMainFrame == true,
             )
@@ -139,5 +148,67 @@ class TestWebViewClient(
                 canGoForward = view?.canGoForward() == true,
             )
         )
+    }
+
+    private fun WebResourceResponse?.capturedTextBody(url: String?): String? {
+        this ?: return null
+        val contentType = responseHeaders.contentTypeHeader() ?: mimeType
+        if (!DebugNetworkContentFormatter.isTextLike(contentType, url)) return null
+        val stream = data ?: return null
+        return runCatching {
+            stream.readBoundedText(
+                charset = charsetFrom(encoding, contentType),
+                maxBytes = DebugNetworkContentFormatter.MaxCapturedBodyBytes,
+            )
+        }.getOrNull()
+    }
+
+    private fun InputStream.readBoundedText(charset: Charset, maxBytes: Int): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var totalBytes = 0
+        var isTruncated = false
+        while (true) {
+            val maxRead = minOf(buffer.size, maxBytes + 1 - totalBytes)
+            if (maxRead <= 0) {
+                isTruncated = true
+                break
+            }
+            val read = read(buffer, 0, maxRead)
+            if (read <= 0) break
+            output.write(buffer, 0, read)
+            totalBytes += read
+            if (totalBytes > maxBytes) {
+                isTruncated = true
+                break
+            }
+        }
+
+        val bytes = output.toByteArray()
+        val visibleBytes = if (bytes.size > maxBytes) bytes.copyOf(maxBytes) else bytes
+        val text = String(visibleBytes, charset)
+        return if (isTruncated) {
+            "$text\n\n[truncated to $maxBytes bytes]"
+        } else {
+            text
+        }
+    }
+
+    private fun Map<String, String>?.contentTypeHeader(): String? =
+        orEmpty().entries.firstOrNull { (key, _) ->
+            key.equals("Content-Type", ignoreCase = true)
+        }?.value
+
+    private fun charsetFrom(encoding: String?, contentType: String?): Charset {
+        val charsetName = encoding?.takeIf { it.isNotBlank() }
+            ?: contentType
+                ?.split(";")
+                ?.map { it.trim() }
+                ?.firstOrNull { it.startsWith("charset=", ignoreCase = true) }
+                ?.substringAfter("=")
+                ?.trim('"')
+        return charsetName
+            ?.let { runCatching { Charset.forName(it) }.getOrNull() }
+            ?: StandardCharsets.UTF_8
     }
 }

@@ -66,4 +66,61 @@ class DebugResultFormatterTest {
         assertEquals("theme", rows[1].key)
         assertEquals("dark", rows[1].value)
     }
+
+    @Test fun formatsNetworkJsonResponseBody() {
+        val formatted = DebugNetworkContentFormatter.format(
+            body = """{"ok":true,"items":[{"id":1}]}""",
+            contentType = "application/json; charset=utf-8",
+            url = "https://example.com/api",
+        )
+
+        assertEquals(NetworkContentKind.JSON, formatted.kind)
+        assertTrue(formatted.text.contains(""""ok": true"""))
+        assertTrue(formatted.text.contains(""""items": ["""))
+    }
+
+    @Test fun formatsNetworkJsonBodyWithoutContentType() {
+        val formatted = DebugNetworkContentFormatter.format(
+            body = """[{"name":"one"}]""",
+            contentType = null,
+            url = null,
+        )
+
+        assertEquals(NetworkContentKind.JSON, formatted.kind)
+        assertTrue(formatted.text.contains(""""name": "one""""))
+    }
+
+    @Test fun classifiesNetworkContentFromMimeAndExtension() {
+        assertEquals(
+            NetworkContentKind.CSS,
+            DebugNetworkContentFormatter.classify("text/css", "https://example.com/app"),
+        )
+        assertEquals(
+            NetworkContentKind.JAVASCRIPT,
+            DebugNetworkContentFormatter.classify(null, "https://example.com/app.mjs"),
+        )
+        assertEquals(
+            NetworkContentKind.IMAGE,
+            DebugNetworkContentFormatter.classify("image/png", "https://example.com/photo"),
+        )
+        assertEquals(
+            NetworkContentKind.VIDEO,
+            DebugNetworkContentFormatter.classify(null, "https://example.com/clip.mp4"),
+        )
+        assertTrue(DebugNetworkContentFormatter.isTextLike("text/html", "https://example.com"))
+        assertTrue(DebugNetworkContentFormatter.classify("audio/mpeg", null).isPreviewableMedia)
+    }
+
+    @Test fun truncatesFormattedNetworkBody() {
+        val formatted = DebugNetworkContentFormatter.format(
+            body = "abcdef",
+            contentType = "text/plain",
+            url = null,
+            maxChars = 3,
+        )
+
+        assertEquals(NetworkContentKind.TEXT, formatted.kind)
+        assertTrue(formatted.isTruncated)
+        assertEquals("abc\n\n[truncated to 3 chars]", formatted.text)
+    }
 }

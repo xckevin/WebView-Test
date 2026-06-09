@@ -49,6 +49,44 @@ class DebugInspectParserTest {
         assertEquals("submit-button", element.attributes["data-testid"])
     }
 
+    @Test fun parsesSelectedElementTreeWithLeafSelectedByDefault() {
+        val result = """
+            {
+              "ok": true,
+              "value": {
+                "type": "selectedElementTree",
+                "selectedIndex": 2,
+                "truncatedAncestors": false,
+                "path": [
+                  {"tag": "html", "id": "", "className": "", "text": "Page", "visible": true, "depth": 0, "childIndex": 0, "childCount": 1},
+                  {"tag": "body", "id": "", "className": "theme", "text": "Page", "visible": true, "depth": 1, "childIndex": 1, "childCount": 1},
+                  {
+                    "tag": "button",
+                    "id": "buy",
+                    "className": "primary",
+                    "text": "Buy now",
+                    "visible": true,
+                    "rect": {"x": 12, "y": 24, "width": 120, "height": 44},
+                    "attributes": {"data-testid": "buy-button"},
+                    "depth": 2,
+                    "childIndex": 0,
+                    "childCount": 0
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val parsed = DebugInspectParser.parse(result) as DebugInspectResult.Tree
+
+        assertEquals(3, parsed.path.size)
+        assertEquals(2, parsed.selectedIndex)
+        assertEquals("button", parsed.path[parsed.selectedIndex].tag)
+        assertEquals("Buy now", parsed.path[parsed.selectedIndex].text)
+        assertEquals(0, parsed.path[parsed.selectedIndex].childCount)
+        assertEquals("buy-button", parsed.path[parsed.selectedIndex].attributes["data-testid"])
+    }
+
     @Test fun parsesReadSourceWrapperAsSource() {
         val result = """{"ok":true,"value":"<!doctype html><html><body><main>Content</main></body></html>"}"""
 

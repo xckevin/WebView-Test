@@ -45,6 +45,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +73,7 @@ import com.xckevin.android.app.webview.test.debug.DebugEventType
 import com.xckevin.android.app.webview.test.debug.DebugSeverity
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.debug.DownloadSnapshot
+import com.xckevin.android.app.webview.test.debug.DebugNetworkApiCaptureParser
 import com.xckevin.android.app.webview.test.debug.DebugResultFormatter
 import com.xckevin.android.app.webview.test.debug.JsExecutionResult
 import com.xckevin.android.app.webview.test.debug.PageError
@@ -101,6 +103,11 @@ internal fun DebugPanel(
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit = {},
+    onDebugBridgeCallbacksChanged: (
+        onInspectResult: ((String) -> Unit)?,
+        onNetworkApiCapture: ((String) -> Unit)?,
+    ) -> Unit = { _, _ -> },
+    onInspectPointerStarted: () -> Unit = {},
     selectedMode: DebugMode? = null,
     showModeTabs: Boolean = true,
     modifier: Modifier = Modifier,
@@ -111,11 +118,31 @@ internal fun DebugPanel(
     val storageResults = remember { mutableStateListOf<DebugStorageResult>() }
     var selectedStorageResult by remember { mutableStateOf<DebugStorageResult?>(null) }
     var inspectResult by remember { mutableStateOf<String?>(null) }
+    val apiResponses = remember { mutableStateListOf<PageError>() }
     var selectedNetworkRequest by remember { mutableStateOf<RequestSnapshot?>(null) }
     var selectedNetworkDownload by remember { mutableStateOf<DownloadSnapshot?>(null) }
+    var selectedNetworkResponse by remember { mutableStateOf<PageError?>(null) }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    DisposableEffect(Unit) {
+        onDebugBridgeCallbacksChanged(
+            { result -> inspectResult = result },
+            { result ->
+                DebugNetworkApiCaptureParser.parsePageErrors(result).forEach { response ->
+                    apiResponses.add(0, response)
+                }
+                while (apiResponses.size > 100) {
+                    apiResponses.removeAt(apiResponses.lastIndex)
+                }
+            },
+        )
+        onDispose {
+            onDebugBridgeCallbacksChanged(null, null)
+        }
+    }
+
     val copyText: (String, String) -> Unit = { label, value ->
         coroutineScope.launch {
             clipboard.setClipEntry(ClipData.newPlainText(label, value).toClipEntry())
@@ -233,18 +260,24 @@ internal fun DebugPanel(
                 onResult = { result -> inspectResult = result },
                 hasResult = inspectResult != null,
                 onCopy = copyText,
+                onInspectPointerStarted = onInspectPointerStarted,
                 showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
             )
 
             DebugMode.Network -> NetworkTab(
                 requests = debugState.requests,
-                errors = debugState.errors,
+                errors = debugState.errors + apiResponses,
                 downloads = debugState.downloads,
-                onClearDebugLogs = onClearDebugLogs,
+                apiResponses = apiResponses,
+                onClearDebugLogs = {
+                    apiResponses.clear()
+                    onClearDebugLogs()
+                },
                 onClearDebug = onClearDebug,
                 onCopy = copyText,
                 onOpenRequest = { selectedNetworkRequest = it },
+                onOpenApiResponse = { selectedNetworkResponse = it },
                 onOpenDownload = { selectedNetworkDownload = it },
                 showHeader = !showModeTabs,
                 modifier = Modifier.weight(1f),
@@ -318,9 +351,21 @@ internal fun DebugPanel(
         FullscreenDebugDialog(onClose = { selectedNetworkRequest = null }) {
             DebugNetworkDetailScreen(
                 request = request,
-                error = findMatchingHttpError(request, debugState.errors),
+                error = findMatchingHttpError(request, debugState.errors + apiResponses),
                 download = null,
                 onClose = { selectedNetworkRequest = null },
+                onCopy = copyText,
+            )
+        }
+    }
+
+    selectedNetworkResponse?.let { response ->
+        FullscreenDebugDialog(onClose = { selectedNetworkResponse = null }) {
+            DebugNetworkDetailScreen(
+                request = null,
+                error = response,
+                download = null,
+                onClose = { selectedNetworkResponse = null },
                 onCopy = copyText,
             )
         }
@@ -843,11 +888,13 @@ private fun InspectTab(
     onResult: (String) -> Unit,
     hasResult: Boolean,
     onCopy: (String, String) -> Unit,
+    onInspectPointerStarted: () -> Unit,
     showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var elementSearch by remember { mutableStateOf("") }
     var elementSelector by remember { mutableStateOf("") }
+    var pointerMessage by remember { mutableStateOf<String?>(null) }
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(12.dp),
@@ -876,6 +923,33 @@ private fun InspectTab(
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                 )
+            }
+        }
+        item {
+            DebugControlSection(title = "Floating pointer") {
+                DebugActionButton(
+                    text = "Start pointer overlay",
+                    onClick = {
+                        onEvaluateJavaScript(PageScripts.startFloatingInspectPointer()) {
+                            pointerMessage = "Use the page overlay to move, confirm, or cancel."
+                            onInspectPointerStarted()
+                        }
+                    },
+                )
+                Text(
+                    text = "Tap or drag on the page to move the pointer. Confirm and Cancel are on the page overlay.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                pointerMessage?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         item {
@@ -1018,10 +1092,12 @@ private fun NetworkTab(
     requests: List<RequestSnapshot>,
     errors: List<PageError>,
     downloads: List<DownloadSnapshot>,
+    apiResponses: List<PageError>,
     onClearDebugLogs: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit,
     onCopy: (String, String) -> Unit,
     onOpenRequest: (RequestSnapshot) -> Unit,
+    onOpenApiResponse: (PageError) -> Unit,
     onOpenDownload: (DownloadSnapshot) -> Unit,
     showHeader: Boolean,
     modifier: Modifier = Modifier,
@@ -1038,6 +1114,12 @@ private fun NetworkTab(
         query.isBlank() || download.url.contains(query, ignoreCase = true) ||
             download.fileName.orEmpty().contains(query, ignoreCase = true) ||
             download.status.name.contains(query, ignoreCase = true)
+    }
+    val filteredApiResponses = apiResponses.asReversed().filter { response ->
+        query.isBlank() ||
+            response.url.orEmpty().contains(query, ignoreCase = true) ||
+            response.message.contains(query, ignoreCase = true) ||
+            response.statusCode?.toString().orEmpty().contains(query, ignoreCase = true)
     }
     val topHosts = requests
         .groupingBy { it.host.ifBlank { "(no host)" } }
@@ -1088,7 +1170,7 @@ private fun NetworkTab(
             }
         }
 
-        if (filteredRequests.isEmpty() && filteredDownloads.isEmpty()) {
+        if (filteredRequests.isEmpty() && filteredDownloads.isEmpty() && filteredApiResponses.isEmpty()) {
             item {
                 Text(
                     text = stringResource(R.string.debug_no_requests),
@@ -1107,7 +1189,6 @@ private fun NetworkTab(
                         title = "${request.method} ${request.url}",
                         subtitle = formatTime(request.timestamp),
                         details = listOf(
-                            "Tap to open full request/response detail",
                             "Category: ${request.categoryLabel}",
                             "Scheme: ${request.scheme}",
                             "Host: ${request.host}",
@@ -1122,6 +1203,30 @@ private fun NetworkTab(
                 }
             }
 
+            if (filteredApiResponses.isNotEmpty()) {
+                item {
+                    SectionLabel(text = "Captured API responses")
+                }
+                items(filteredApiResponses) { response ->
+                    DebugItem(
+                        title = "${response.responseHeaders["X-Debug-Request-Method"] ?: "API"} ${response.url.orEmpty()}",
+                        subtitle = formatTime(response.timestamp),
+                        details = listOfNotNull(
+                            response.statusCode?.let { "Status: $it ${response.message}" },
+                            response.responseHeaders["X-Debug-Capture-Source"]?.let { "Source: $it" },
+                            response.responseHeaders["Content-Type"]?.let { "Content-Type: $it" },
+                            response.responseHeaders["content-type"]?.let { "Content-Type: $it" },
+                            response.responseHeaders["X-Debug-Duration-Ms"]?.let { "Duration: ${it}ms" },
+                            response.responseHeaders["X-Debug-Body-Truncated"]?.let { "Body truncated: $it" },
+                            response.responseHeaders["X-Debug-Skipped-Body"]?.let { "Body skipped: $it" },
+                            if (response.responseBody.isNullOrBlank()) "Response body: none captured" else "Response body: captured",
+                        ),
+                        onCopy = onCopy,
+                        onClick = { onOpenApiResponse(response) },
+                    )
+                }
+            }
+
             if (filteredDownloads.isNotEmpty()) {
                 item {
                     SectionLabel(text = stringResource(R.string.debug_tab_downloads))
@@ -1131,7 +1236,6 @@ private fun NetworkTab(
                         title = download.url,
                         subtitle = formatTime(download.timestamp),
                         details = listOfNotNull(
-                            "Tap to open full download detail",
                             download.downloadId?.let { "Download id: $it" },
                             download.fileName?.let { "File: $it" },
                             "Status: ${download.status}",

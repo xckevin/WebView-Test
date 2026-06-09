@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xckevin.android.app.webview.test.debug.DownloadSnapshot
+import com.xckevin.android.app.webview.test.debug.DebugNetworkContentFormatter
 import com.xckevin.android.app.webview.test.debug.PageError
 import com.xckevin.android.app.webview.test.debug.RequestSnapshot
 import java.text.DateFormat
@@ -204,6 +205,7 @@ enum class NetworkDetailSectionKind {
     RequestBody,
     ResponseHeaders,
     ResponseBody,
+    MediaPreview,
     Meta,
     Request,
     Response,
@@ -239,7 +241,11 @@ fun buildNetworkDetailSections(
         sections += NetworkDetailSection(
             title = "Request body",
             kind = NetworkDetailSectionKind.RequestBody,
-            rows = bodyRows(request?.requestBody),
+            rows = bodyRows(
+                body = request?.requestBody,
+                headers = request?.requestHeaders,
+                url = request?.url,
+            ),
         )
         sections += NetworkDetailSection(
             title = "Response headers",
@@ -249,13 +255,25 @@ fun buildNetworkDetailSections(
         sections += NetworkDetailSection(
             title = "Response body",
             kind = NetworkDetailSectionKind.ResponseBody,
-            rows = bodyRows(matchedResponse?.responseBody),
+            rows = bodyRows(
+                body = matchedResponse?.responseBody,
+                headers = matchedResponse?.responseHeaders,
+                url = matchedResponse?.url ?: request?.url,
+            ),
         )
         sections += NetworkDetailSection(
             title = "Meta",
             kind = NetworkDetailSectionKind.Meta,
             rows = metaRows(request = request, error = matchedResponse, download = download),
         )
+        mediaPreviewRows(request = request, error = matchedResponse, download = download).takeIf { it.isNotEmpty() }
+            ?.let { rows ->
+                sections += NetworkDetailSection(
+                    title = "Media preview",
+                    kind = NetworkDetailSectionKind.MediaPreview,
+                    rows = rows,
+                )
+            }
     }
 
     if (download != null) {
@@ -392,18 +410,64 @@ private fun Map<String, String>?.toHeaderRows(emptyLabel: String): List<NetworkD
             .map { (key, value) -> NetworkDetailRow(key, value) }
     }
 
-private fun bodyRows(body: String?): List<NetworkDetailRow> =
-    listOf(
+private fun bodyRows(
+    body: String?,
+    headers: Map<String, String>?,
+    url: String?,
+): List<NetworkDetailRow> {
+    val capturedBody = body?.takeIf { it.isNotBlank() }
+    if (capturedBody == null) {
+        return listOf(
+            NetworkDetailRow(
+                label = "Body",
+                value = WEB_VIEW_BODY_NOT_CAPTURED,
+            ),
+        )
+    }
+
+    val formatted = DebugNetworkContentFormatter.format(
+        body = capturedBody,
+        contentType = headers.contentTypeHeader(),
+        url = url,
+    )
+    return listOfNotNull(
+        NetworkDetailRow("Type", formatted.kind.label),
         NetworkDetailRow(
             label = "Body",
-            value = body?.takeIf { it.isNotBlank() } ?: WEB_VIEW_BODY_NOT_CAPTURED,
+            value = formatted.text,
         ),
+        NetworkDetailRow("Truncated", "true").takeIf { formatted.isTruncated },
     )
+}
+
+private fun mediaPreviewRows(
+    request: RequestSnapshot?,
+    error: PageError?,
+    download: DownloadSnapshot?,
+): List<NetworkDetailRow> {
+    val url = download?.url ?: error?.url ?: request?.url
+    val localUri = download?.localUri
+    val contentType = download?.mimeType ?: error?.responseHeaders.contentTypeHeader()
+    val kind = DebugNetworkContentFormatter.classify(contentType = contentType, url = localUri ?: url)
+    if (!kind.isPreviewableMedia) return emptyList()
+
+    return listOfNotNull(
+        NetworkDetailRow("Kind", kind.label),
+        contentType?.let { NetworkDetailRow("MIME type", it) },
+        url?.let { NetworkDetailRow("Preview URL", it) },
+        localUri?.let { NetworkDetailRow("Preview local URI", it) },
+    )
+}
+
+private fun Map<String, String>?.contentTypeHeader(): String? =
+    orEmpty().entries.firstOrNull { (key, _) ->
+        key.equals("Content-Type", ignoreCase = true)
+    }?.value
 
 private fun PageError.matchesHttpResponse(request: RequestSnapshot): Boolean =
-    type == "HttpError" &&
+    type in setOf("HttpError", "ApiResponse") &&
         url == request.url &&
-        navigationId == request.navigationId
+        (navigationId == request.navigationId || navigationId == 0L)
 
 private fun formatNetworkDetailTime(timestamp: Long): String {
     if (timestamp <= 0L) return "-"

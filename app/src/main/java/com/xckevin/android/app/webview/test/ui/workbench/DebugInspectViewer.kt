@@ -1,6 +1,7 @@
 package com.xckevin.android.app.webview.test.ui.workbench
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,11 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.HorizontalDivider
@@ -44,6 +48,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 data class DebugInspectRect(
@@ -63,6 +68,9 @@ data class DebugInspectElement(
     val attributes: Map<String, String> = emptyMap(),
     val href: String = "",
     val src: String = "",
+    val depth: Int = 0,
+    val childIndex: Int = 0,
+    val childCount: Int = 0,
 )
 
 sealed interface DebugInspectResult {
@@ -77,6 +85,14 @@ sealed interface DebugInspectResult {
     data class Source(
         val html: String,
         override val rawText: String,
+    ) : DebugInspectResult
+
+    data class Tree(
+        val path: List<DebugInspectElement>,
+        val selectedIndex: Int,
+        val truncatedAncestors: Boolean,
+        override val rawText: String,
+        val error: String? = null,
     ) : DebugInspectResult
 
     data class PlainText(
@@ -104,6 +120,8 @@ object DebugInspectParser {
             is JsonPrimitive -> classifyText(unwrapped.contentOrNull ?: unwrapped.toString(), rawText = result)
             is JsonObject -> {
                 val error = unwrapped.stringValue("error")
+                val treeResult = unwrapped.toInspectTree(rawText = result, error = error)
+                if (treeResult != null) return treeResult
                 val elementResult = unwrapped.toInspectElement()
                 if (elementResult != null) {
                     DebugInspectResult.Elements(listOf(elementResult), rawText = result, error = error)
@@ -183,11 +201,31 @@ object DebugInspectParser {
             attributes = attributes,
             href = stringValue("href"),
             src = stringValue("src"),
+            depth = intValue("depth"),
+            childIndex = intValue("childIndex"),
+            childCount = intValue("childCount"),
+        )
+    }
+
+    private fun JsonObject.toInspectTree(rawText: String, error: String?): DebugInspectResult.Tree? {
+        if (stringValue("type") != "selectedElementTree") return null
+        val path = (this["path"] as? JsonArray)
+            ?.mapNotNull { (it as? JsonObject)?.toInspectElement() }
+            .orEmpty()
+        return DebugInspectResult.Tree(
+            path = path,
+            selectedIndex = intValue("selectedIndex").coerceIn(0, (path.size - 1).coerceAtLeast(0)),
+            truncatedAncestors = this["truncatedAncestors"]?.asJsonPrimitiveOrNull()?.booleanOrNull == true,
+            rawText = rawText,
+            error = error,
         )
     }
 
     private fun JsonObject.stringValue(key: String): String =
         this[key]?.displayValue().orEmpty()
+
+    private fun JsonObject.intValue(key: String): Int =
+        this[key]?.asJsonPrimitiveOrNull()?.intOrNull ?: 0
 
     private fun JsonObject.doubleValue(key: String): Double =
         this[key]?.asJsonPrimitiveOrNull()?.doubleOrNull ?: 0.0
@@ -221,6 +259,11 @@ fun DebugInspectViewer(
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             when (parsed) {
+                is DebugInspectResult.Tree -> TreeInspectContent(
+                    result = parsed,
+                    modifier = Modifier.weight(1f),
+                )
+
                 is DebugInspectResult.Elements -> ElementInspectContent(
                     result = parsed,
                     query = query,
@@ -278,6 +321,153 @@ private fun DebugInspectTopBar(
         }
         IconButton(onClick = onCopy) {
             Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy all")
+        }
+    }
+}
+
+@Composable
+private fun TreeInspectContent(
+    result: DebugInspectResult.Tree,
+    modifier: Modifier = Modifier,
+) {
+    var selectedIndex by remember(result.path, result.selectedIndex) {
+        mutableStateOf(result.selectedIndex.coerceIn(0, (result.path.size - 1).coerceAtLeast(0)))
+    }
+    val selectedElement = result.path.getOrNull(selectedIndex)
+
+    Column(modifier = modifier.fillMaxSize()) {
+        result.error?.let { ErrorBanner(it) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                enabled = selectedIndex > 0,
+                onClick = { selectedIndex = (selectedIndex - 1).coerceAtLeast(0) },
+            ) {
+                Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Select parent node")
+            }
+            IconButton(
+                enabled = selectedIndex < result.path.lastIndex,
+                onClick = { selectedIndex = (selectedIndex + 1).coerceAtMost(result.path.lastIndex) },
+            ) {
+                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Select child node")
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = selectedElement?.label() ?: "No element selected",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = buildString {
+                        append("Node ${selectedIndex + 1} of ${result.path.size}")
+                        if (result.truncatedAncestors) append(" · ancestors truncated")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 12.dp),
+        ) {
+            if (selectedElement != null) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = "Selected node",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            ElementDetails(selectedElement)
+                        }
+                    }
+                }
+            }
+            item {
+                Text(
+                    text = "Element path",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            items(result.path.mapIndexed { index, element -> index to element }, key = { it.first }) { (index, element) ->
+                TreeElementRow(
+                    element = element,
+                    selected = index == selectedIndex,
+                    depth = index,
+                    onClick = { selectedIndex = index },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TreeElementRow(
+    element: DebugInspectElement,
+    selected: Boolean,
+    depth: Int,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (12 + depth * 14).dp, end = 12.dp, top = 2.dp, bottom = 2.dp)
+            .clickable(onClick = onClick),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = element.label(),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+            )
+            Text(
+                text = buildString {
+                    append("child ${element.childIndex + 1}")
+                    append(" · ${element.childCount} children")
+                    element.text.ifBlank { element.href.ifBlank { element.src } }.takeIf { it.isNotBlank() }?.let {
+                        append(" · ")
+                        append(it)
+                    }
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+            )
         }
     }
 }
@@ -370,7 +560,9 @@ private fun ElementRow(
 @Composable
 private fun ElementDetails(element: DebugInspectElement) {
     Column(
-        modifier = Modifier.padding(start = 36.dp),
+        modifier = Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 36.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         DetailLine("tag", element.tag)
@@ -503,6 +695,7 @@ private fun DetailLine(label: String, value: String) {
 
 private fun DebugInspectResult.subtitle(): String =
     when (this) {
+        is DebugInspectResult.Tree -> "${path.size} selected path nodes"
         is DebugInspectResult.Elements -> "${elements.size} elements"
         is DebugInspectResult.Source -> "${html.lines().size} source lines"
         is DebugInspectResult.PlainText -> "Text result"

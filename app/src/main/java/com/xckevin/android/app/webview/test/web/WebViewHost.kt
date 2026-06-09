@@ -1,8 +1,11 @@
 package com.xckevin.android.app.webview.test.web
 
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -19,9 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.xckevin.android.app.webview.test.R
+import com.xckevin.android.app.webview.test.debug.PageScripts
 import com.xckevin.android.app.webview.test.model.WebCacheMode
 import com.xckevin.android.app.webview.test.model.WebTestConfig
+import java.util.Collections
 
 class WebViewController {
     private var webView: WebView? = null
@@ -29,6 +36,8 @@ class WebViewController {
     private var downloadHandler: DownloadHandler? = null
     private var fullscreenVideoHandler: FullscreenVideoHandler? = null
     private var webPermissionHandler: WebPermissionHandler? = null
+    private var inspectResultHandler: ((String) -> Unit)? = null
+    private var networkApiCaptureHandler: ((String) -> Unit)? = null
 
     fun canGoBack(): Boolean = webView?.canGoBack() == true
 
@@ -58,6 +67,14 @@ class WebViewController {
         }
 
         webView.evaluateJavascript(script, callback)
+    }
+
+    fun setDebugBridgeCallbacks(
+        onInspectResult: ((String) -> Unit)?,
+        onNetworkApiCapture: ((String) -> Unit)?,
+    ) {
+        inspectResultHandler = onInspectResult
+        networkApiCaptureHandler = onNetworkApiCapture
     }
 
     fun readCookies(): String {
@@ -119,6 +136,48 @@ class WebViewController {
         downloadHandler = null
         fullscreenVideoHandler = null
         webPermissionHandler = null
+        inspectResultHandler = null
+        networkApiCaptureHandler = null
+    }
+
+    internal fun dispatchInspectResult(result: String) {
+        inspectResultHandler?.invoke(result)
+    }
+
+    internal fun dispatchNetworkApiCapture(result: String) {
+        networkApiCaptureHandler?.invoke(result)
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun registerDebugNetworkApiCapture(webView: WebView) {
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+        WebViewCompat.addDocumentStartJavaScript(
+            webView,
+            PageScripts.installNetworkApiCapture(),
+            Collections.singleton("*"),
+        )
+    }
+    installDebugNetworkApiCaptureNow(webView)
+}
+
+private fun installDebugNetworkApiCaptureNow(webView: WebView) {
+    webView.evaluateJavascript(PageScripts.installNetworkApiCapture(), null)
+}
+
+private class WebDebugJavascriptBridge(
+    private val controller: WebViewController,
+) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    @JavascriptInterface
+    fun onInspectResult(result: String) {
+        mainHandler.post { controller.dispatchInspectResult(result) }
+    }
+
+    @JavascriptInterface
+    fun onNetworkApiCapture(result: String) {
+        mainHandler.post { controller.dispatchNetworkApiCapture(result) }
     }
 }
 
@@ -301,9 +360,14 @@ fun WebViewHost(
                     controller.attachFullscreenVideoHandler(fullscreenVideoHandler)
                     controller.attachWebPermissionHandler(webPermissionHandler)
 
+                    webView.addJavascriptInterface(WebDebugJavascriptBridge(controller), "__wvAndroidDebug")
+                    registerDebugNetworkApiCapture(webView)
                     webView.webViewClient = TestWebViewClient(
                         navigationTracker = navigationTracker,
                         onEvent = eventSink,
+                        onDebugPageReady = { readyView ->
+                            installDebugNetworkApiCaptureNow(readyView)
+                        },
                     )
                     webView.webChromeClient = TestWebChromeClient(
                         navigationTracker = navigationTracker,
@@ -341,6 +405,7 @@ fun WebViewHost(
                 controller.hideCustomView()
                 webView.stopLoading()
                 webView.setDownloadListener(null)
+                webView.removeJavascriptInterface("__wvAndroidDebug")
                 webView.webChromeClient = null
                 webView.webViewClient = WebViewClient()
                 webView.setOnLongClickListener(null)
