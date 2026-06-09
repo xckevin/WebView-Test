@@ -45,7 +45,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -73,7 +72,6 @@ import com.xckevin.android.app.webview.test.debug.DebugEventType
 import com.xckevin.android.app.webview.test.debug.DebugSeverity
 import com.xckevin.android.app.webview.test.debug.DebugState
 import com.xckevin.android.app.webview.test.debug.DownloadSnapshot
-import com.xckevin.android.app.webview.test.debug.DebugNetworkApiCaptureParser
 import com.xckevin.android.app.webview.test.debug.DebugResultFormatter
 import com.xckevin.android.app.webview.test.debug.JsExecutionResult
 import com.xckevin.android.app.webview.test.debug.PageError
@@ -103,10 +101,8 @@ internal fun DebugPanel(
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit = {},
-    onDebugBridgeCallbacksChanged: (
-        onInspectResult: ((String) -> Unit)?,
-        onNetworkApiCapture: ((String) -> Unit)?,
-    ) -> Unit = { _, _ -> },
+    apiResponses: List<PageError> = emptyList(),
+    onClearApiResponses: () -> Unit = {},
     onInspectPointerStarted: () -> Unit = {},
     selectedMode: DebugMode? = null,
     showModeTabs: Boolean = true,
@@ -118,30 +114,12 @@ internal fun DebugPanel(
     val storageResults = remember { mutableStateListOf<DebugStorageResult>() }
     var selectedStorageResult by remember { mutableStateOf<DebugStorageResult?>(null) }
     var inspectResult by remember { mutableStateOf<String?>(null) }
-    val apiResponses = remember { mutableStateListOf<PageError>() }
     var selectedNetworkRequest by remember { mutableStateOf<RequestSnapshot?>(null) }
     var selectedNetworkDownload by remember { mutableStateOf<DownloadSnapshot?>(null) }
     var selectedNetworkResponse by remember { mutableStateOf<PageError?>(null) }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
-    DisposableEffect(Unit) {
-        onDebugBridgeCallbacksChanged(
-            { result -> inspectResult = result },
-            { result ->
-                DebugNetworkApiCaptureParser.parsePageErrors(result).forEach { response ->
-                    apiResponses.add(0, response)
-                }
-                while (apiResponses.size > 100) {
-                    apiResponses.removeAt(apiResponses.lastIndex)
-                }
-            },
-        )
-        onDispose {
-            onDebugBridgeCallbacksChanged(null, null)
-        }
-    }
 
     val copyText: (String, String) -> Unit = { label, value ->
         coroutineScope.launch {
@@ -271,7 +249,7 @@ internal fun DebugPanel(
                 downloads = debugState.downloads,
                 apiResponses = apiResponses,
                 onClearDebugLogs = {
-                    apiResponses.clear()
+                    onClearApiResponses()
                     onClearDebugLogs()
                 },
                 onClearDebug = onClearDebug,
@@ -1285,7 +1263,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.resultItems(
 }
 
 @Composable
-private fun FullscreenDebugDialog(
+internal fun FullscreenDebugDialog(
     onClose: () -> Unit,
     content: @Composable () -> Unit,
 ) {

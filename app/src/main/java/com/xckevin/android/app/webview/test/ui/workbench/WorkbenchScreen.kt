@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,7 +79,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xckevin.android.app.webview.test.AppContainer
 import com.xckevin.android.app.webview.test.R
 import com.xckevin.android.app.webview.test.debug.DebugClearScope
+import com.xckevin.android.app.webview.test.debug.DebugNetworkApiCaptureParser
 import com.xckevin.android.app.webview.test.debug.DebugState
+import com.xckevin.android.app.webview.test.debug.PageError
 import com.xckevin.android.app.webview.test.debug.UserFlowKind
 import com.xckevin.android.app.webview.test.model.HistoryItem
 import com.xckevin.android.app.webview.test.model.WebTestConfig
@@ -117,6 +120,8 @@ fun WorkbenchScreen(
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
     val webViewController = rememberWebViewController()
+    var bridgeInspectResult by remember { mutableStateOf<String?>(null) }
+    val apiResponses = remember { mutableStateListOf<PageError>() }
     var pendingOpenDocumentResult by remember { mutableStateOf<((Uri?) -> Unit)?>(null) }
     var pendingRuntimePermissionResult by remember { mutableStateOf<((Map<String, Boolean>) -> Unit)?>(null) }
     var pendingRuntimePermissionAlreadyGranted by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
@@ -212,7 +217,19 @@ fun WorkbenchScreen(
     }
 
     DisposableEffect(Unit) {
+        webViewController.setDebugBridgeCallbacks(
+            onInspectResult = { result -> bridgeInspectResult = result },
+            onNetworkApiCapture = { result ->
+                DebugNetworkApiCaptureParser.parsePageErrors(result).forEach { response ->
+                    apiResponses.add(0, response)
+                }
+                while (apiResponses.size > 100) {
+                    apiResponses.removeAt(apiResponses.lastIndex)
+                }
+            },
+        )
         onDispose {
+            webViewController.setDebugBridgeCallbacks(null, null)
             pendingOpenDocumentResult?.invoke(null)
             pendingOpenDocumentResult = null
             pendingRuntimePermissionResult?.invoke(emptyMap())
@@ -294,11 +311,12 @@ fun WorkbenchScreen(
                 onDeleteHistoryItem = viewModel::deleteHistoryItem,
                 onClearDebugLogs = viewModel::clearDebugLogs,
                 onClearDebug = viewModel::clearDebug,
+                apiResponses = apiResponses,
+                onClearApiResponses = { apiResponses.clear() },
                 onEvaluateJavaScript = evaluateJavaScript,
                 onReadCookies = readCookies,
                 onClearCookies = clearCookies,
                 onClearWebViewCache = clearWebViewCache,
-                onDebugBridgeCallbacksChanged = webViewController::setDebugBridgeCallbacks,
                 onFullscreenExit = {
                     if (!state.isVideoFullscreen || !webViewController.hideCustomView()) {
                         viewModel.toggleFullscreen()
@@ -306,6 +324,22 @@ fun WorkbenchScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+
+            bridgeInspectResult?.let { result ->
+                FullscreenDebugDialog(onClose = { bridgeInspectResult = null }) {
+                    DebugInspectViewer(
+                        result = result,
+                        onClose = { bridgeInspectResult = null },
+                        onCopy = { value ->
+                            coroutineScope.launch {
+                                clipboard.setClipEntry(
+                                    ClipData.newPlainText("inspect-result", value).toClipEntry()
+                                )
+                            }
+                        },
+                    )
+                }
+            }
 
             WebContextMenuDropdown(
                 target = contextMenuTarget,
@@ -381,14 +415,12 @@ internal fun WorkbenchFrame(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit = {},
+    apiResponses: List<PageError> = emptyList(),
+    onClearApiResponses: () -> Unit = {},
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
-    onDebugBridgeCallbacksChanged: (
-        onInspectResult: ((String) -> Unit)?,
-        onNetworkApiCapture: ((String) -> Unit)?,
-    ) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     onFullscreenExit: () -> Unit = {},
 ) {
@@ -475,11 +507,12 @@ internal fun WorkbenchFrame(
                         onDeleteHistoryItem = onDeleteHistoryItem,
                         onClearDebugLogs = onClearDebugLogs,
                         onClearDebug = onClearDebug,
+                        apiResponses = apiResponses,
+                        onClearApiResponses = onClearApiResponses,
                         onEvaluateJavaScript = onEvaluateJavaScript,
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
                         onClearWebViewCache = onClearWebViewCache,
-                        onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
                         onInspectPointerStarted = {},
                         modifier = Modifier.weight(1f),
                     )
@@ -501,11 +534,12 @@ internal fun WorkbenchFrame(
                         onDeleteHistoryItem = onDeleteHistoryItem,
                         onClearDebugLogs = onClearDebugLogs,
                         onClearDebug = onClearDebug,
+                        apiResponses = apiResponses,
+                        onClearApiResponses = onClearApiResponses,
                         onEvaluateJavaScript = onEvaluateJavaScript,
                         onReadCookies = onReadCookies,
                         onClearCookies = onClearCookies,
                         onClearWebViewCache = onClearWebViewCache,
-                        onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
                         onInspectPointerStarted = closeTools,
                         modifier = Modifier
                             .fillMaxSize()
@@ -560,14 +594,12 @@ private fun WorkbenchDrawer(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit,
+    apiResponses: List<PageError> = emptyList(),
+    onClearApiResponses: () -> Unit = {},
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
-    onDebugBridgeCallbacksChanged: (
-        onInspectResult: ((String) -> Unit)?,
-        onNetworkApiCapture: ((String) -> Unit)?,
-    ) -> Unit,
     onInspectPointerStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -622,11 +654,12 @@ private fun WorkbenchDrawer(
                 onDeleteHistoryItem = onDeleteHistoryItem,
                 onClearDebugLogs = onClearDebugLogs,
                 onClearDebug = onClearDebug,
+                apiResponses = apiResponses,
+                onClearApiResponses = onClearApiResponses,
                 onEvaluateJavaScript = onEvaluateJavaScript,
                 onReadCookies = onReadCookies,
                 onClearCookies = onClearCookies,
                 onClearWebViewCache = onClearWebViewCache,
-                onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
                 onInspectPointerStarted = onInspectPointerStarted,
                 modifier = Modifier
                     .weight(1f)
@@ -882,14 +915,12 @@ private fun WorkbenchPanelSurface(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit,
+    apiResponses: List<PageError> = emptyList(),
+    onClearApiResponses: () -> Unit = {},
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
-    onDebugBridgeCallbacksChanged: (
-        onInspectResult: ((String) -> Unit)?,
-        onNetworkApiCapture: ((String) -> Unit)?,
-    ) -> Unit,
     onInspectPointerStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -913,11 +944,12 @@ private fun WorkbenchPanelSurface(
                 onDeleteHistoryItem = onDeleteHistoryItem,
                 onClearDebugLogs = onClearDebugLogs,
                 onClearDebug = onClearDebug,
+                apiResponses = apiResponses,
+                onClearApiResponses = onClearApiResponses,
                 onEvaluateJavaScript = onEvaluateJavaScript,
                 onReadCookies = onReadCookies,
                 onClearCookies = onClearCookies,
                 onClearWebViewCache = onClearWebViewCache,
-                onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
                 onInspectPointerStarted = onInspectPointerStarted,
                 modifier = Modifier.weight(1f),
             )
@@ -975,14 +1007,12 @@ private fun PanelContent(
     onDeleteHistoryItem: (HistoryItem) -> Unit,
     onClearDebugLogs: () -> Unit,
     onClearDebug: (DebugClearScope) -> Unit,
+    apiResponses: List<PageError> = emptyList(),
+    onClearApiResponses: () -> Unit = {},
     onEvaluateJavaScript: (script: String, callback: (String) -> Unit) -> Unit,
     onReadCookies: ((String) -> Unit) -> Unit,
     onClearCookies: () -> Unit,
     onClearWebViewCache: () -> Unit,
-    onDebugBridgeCallbacksChanged: (
-        onInspectResult: ((String) -> Unit)?,
-        onNetworkApiCapture: ((String) -> Unit)?,
-    ) -> Unit,
     onInspectPointerStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -992,11 +1022,12 @@ private fun PanelContent(
         sourceType = state.activeSourceType,
         onClearDebugLogs = onClearDebugLogs,
         onClearDebug = onClearDebug,
+        apiResponses = apiResponses,
+        onClearApiResponses = onClearApiResponses,
         onEvaluateJavaScript = onEvaluateJavaScript,
         onReadCookies = onReadCookies,
         onClearCookies = onClearCookies,
         onClearWebViewCache = onClearWebViewCache,
-        onDebugBridgeCallbacksChanged = onDebugBridgeCallbacksChanged,
         onInspectPointerStarted = onInspectPointerStarted,
         selectedMode = selectedPanel.debugMode,
         showModeTabs = false,
