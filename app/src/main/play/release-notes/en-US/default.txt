@@ -1,0 +1,6 @@
+Initial release.
+
+- Load remote URLs, QR code results, and local HTML files.
+- Tune WebView settings for compatibility testing.
+- Inspect console output, errors, cookies, storage, source, elements, requests, and downloads.
+- Test WebView permission flows for camera, microphone, files, and geolocation.

@@ -1,0 +1,6 @@
+Première version.
+
+- Charge des URLs distantes, des résultats QR et des fichiers HTML locaux.
+- Ajuste les paramètres WebView pour les tests de compatibilité.
+- Inspecte console, erreurs, cookies, storage, source, éléments, requêtes et téléchargements.
+- Teste les permissions WebView pour caméra, micro, fichiers et géolocalisation.

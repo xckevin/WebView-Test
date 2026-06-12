@@ -1,0 +1,16 @@
+WebViewTest é uma ferramenta prática de teste Android WebView para programadores, equipas de QA e equipas que trabalham com apps híbridas ou páginas web móveis.
+
+Permite carregar um URL, ler um código QR, abrir um ficheiro HTML local, ajustar o comportamento do WebView e inspecionar a página diretamente num dispositivo real.
+
+Funcionalidades principais:
+
+- Carregar páginas http e https com normalização de URL.
+- Ler códigos QR para abrir rapidamente páginas de teste.
+- Abrir ficheiros HTML locais através do seletor de ficheiros do sistema.
+- Guardar histórico recente de URLs remotos e ficheiros locais.
+- Alternar JavaScript, DOM Storage, cookies, cookies de terceiros, cache, conteúdo misto, modo desktop, User-Agent, modo de cor e ecrã inteiro.
+- Testar permissões web de câmara, microfone, seletor de ficheiros e geolocalização.
+- Inspecionar logs de console, erros de página, cookies, storage, fonte HTML, elementos simplificados, resultados JavaScript, pedidos capturados e downloads.
+- Ativar manualmente a depuração WebView em builds release nas Settings e inspecionar com o Chrome no computador.
+
+WebViewTest foi criado para teste e depuração. Não é um navegador web geral e não é afiliado à Google, Android ou ao site Android Developers.

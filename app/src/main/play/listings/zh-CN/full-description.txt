@@ -1,0 +1,16 @@
+WebViewTest 是面向开发者、测试工程师和混合应用团队的 Android WebView 测试工具。
+
+你可以用它加载 URL、扫描二维码、打开本地 HTML 文件、调整 WebView 行为，并在真实设备上直接检查页面状态。
+
+主要功能：
+
+- 加载 http 和 https 页面，并自动规范化 URL。
+- 扫描二维码，快速打开测试页面。
+- 通过系统文件选择器打开本地 HTML 文件。
+- 保存远程 URL 和本地文件的最近测试历史。
+- 切换 JavaScript、DOM Storage、Cookie、第三方 Cookie、缓存、混合内容、桌面模式、User-Agent、颜色模式和全屏行为。
+- 测试网页相机、麦克风、文件选择器和地理位置权限流程。
+- 检查 console 日志、页面错误、Cookie、Storage、HTML 源码、简化元素摘要、JavaScript 执行结果、请求记录和下载请求。
+- 可在设置中手动开启 release 包的 WebView 调试，然后通过桌面 Chrome 检查 WebView。
+
+WebViewTest 用于测试和调试，不是通用浏览器，也不隶属于 Google、Android 或 Android Developers 网站。

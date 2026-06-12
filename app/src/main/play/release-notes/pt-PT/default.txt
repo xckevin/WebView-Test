@@ -1,0 +1,6 @@
+Lançamento inicial.
+
+- Carrega URLs remotos, resultados QR e ficheiros HTML locais.
+- Ajusta definições WebView para testes de compatibilidade.
+- Inspeciona console, erros, cookies, storage, fonte, elementos, pedidos e downloads.
+- Testa permissões WebView para câmara, microfone, ficheiros e geolocalização.

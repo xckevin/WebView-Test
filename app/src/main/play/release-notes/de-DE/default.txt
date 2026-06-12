@@ -1,0 +1,6 @@
+Erste Version.
+
+- Lädt entfernte URLs, QR-Ergebnisse und lokale HTML-Dateien.
+- Passt WebView-Einstellungen für Kompatibilitätstests an.
+- Prüft console, Fehler, Cookies, Storage, Quelltext, Elemente, Anfragen und Downloads.
+- Testet WebView-Berechtigungen für Kamera, Mikrofon, Dateien und Standort.

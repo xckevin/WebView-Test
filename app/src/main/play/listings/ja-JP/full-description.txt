@@ -1,0 +1,16 @@
+WebViewTest は、開発者、QA エンジニア、ハイブリッドアプリやモバイル Web ページを扱うチーム向けの Android WebView テストツールです。
+
+URL の読み込み、QR コードのスキャン、ローカル HTML ファイルのオープン、WebView 設定の変更、実機上でのページ検査に利用できます。
+
+主な機能：
+
+- http と https ページを読み込み、URL を正規化。
+- QR コードをスキャンしてテストページをすばやく開く。
+- システムのファイル選択からローカル HTML ファイルを開く。
+- リモート URL とローカルファイルの最近の履歴を保存。
+- JavaScript、DOM Storage、Cookie、サードパーティ Cookie、キャッシュ、混在コンテンツ、デスクトップモード、User-Agent、カラーモード、全画面表示を切り替え。
+- Web カメラ、マイク、ファイル選択、位置情報の権限フローをテスト。
+- console ログ、ページエラー、Cookie、Storage、HTML ソース、簡易 Elements、JavaScript 実行結果、リクエスト、ダウンロード要求を確認。
+- Settings から release ビルドの WebView debugging を手動で有効化し、デスクトップ Chrome で検査。
+
+WebViewTest はテストとデバッグ用です。一般的な Web ブラウザではなく、Google、Android、Android Developers サイトとは提携していません。
