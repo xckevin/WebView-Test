@@ -16,6 +16,7 @@ local.properties
 .superpowers/
 .omc/
 docs/superpowers/
+app/release
 
 # Google Play Publisher local credentials
 play-account.json
