@@ -1,6 +1,7 @@
 package com.xckevin.android.app.webview.test.scanner
 
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -14,6 +15,7 @@ class BarcodeAnalyzer(
     private val emittedRawValues = mutableSetOf<String>()
     private var hasEmitted = false
 
+    @ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image
         if (mediaImage == null) {

@@ -1,5 +1,6 @@
 package com.xckevin.android.app.webview.test.web
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -150,6 +151,7 @@ class WebViewController {
 }
 
 @Suppress("DEPRECATION")
+@SuppressLint("RestrictedApi")
 private fun registerDebugNetworkApiCapture(webView: WebView) {
     if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
         WebViewCompat.addDocumentStartJavaScript(
